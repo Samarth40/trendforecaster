@@ -46,41 +46,75 @@ class DashboardService {
     };
   }
 
-  // Initialize user stats document with all required fields
+  // Initialize user stats
   async initializeUserStats(userId) {
     try {
+      if (!userId) {
+        console.error('No userId provided for initialization');
+        throw new Error('User ID is required');
+      }
+
+      // Get reference to user stats document
       const userStatsRef = doc(db, 'userStats', userId);
-      const initialStats = {
-        userId: userId, // Add userId to the document
-        trendStatsCount: 0,
-        contentStatsCount: 0,
-        lastActive: serverTimestamp(),
-        activeTrendsCount: 0,
-        totalIdeasCount: 0,
-        currentEngagementRate: 0,
-        // Add activity tracking
-        activityHistory: [],
-        dailyActivityCount: 0,
-        lastActivityDate: serverTimestamp(),
-        // Add performance metrics
-        averageResponseTime: 0,
-        totalInteractions: 0,
-        // Add session tracking
-        sessionCount: increment(1), // Increment session count on initialization
-        totalSessionDuration: 0,
-        currentSessionStart: serverTimestamp(),
-        createdAt: serverTimestamp() // Add creation timestamp
-      };
       
-      await setDoc(userStatsRef, initialStats, { merge: true });
-      
-      // Also create initial documents in other collections
-      await this.initializeUserCollections(userId);
-      
-      return initialStats;
+      try {
+        const userStatsDoc = await getDoc(userStatsRef);
+
+        // If document doesn't exist, create it with initial data
+        if (!userStatsDoc.exists()) {
+          const initialStats = {
+            userId: userId,
+            activeTrendsCount: 0,
+            platforms: {
+              active: 0,
+              connected: [],
+              platforms: {
+                twitter: false,
+                reddit: false,
+                youtube: false,
+                instagram: false,
+                tiktok: false,
+                linkedin: false,
+                github: false
+              }
+            },
+            savedIdeas: {
+              total: 0,
+              items: []
+            },
+            dailyActivityCount: 0,
+            lastActive: serverTimestamp(),
+            currentSessionStart: serverTimestamp(),
+            activityHistory: [],
+            activityCounts: {},
+            performance: {
+              responseTime: 0,
+              interactions: 0,
+              sessionDuration: 0,
+              activeTime: 0
+            }
+          };
+
+          // Set the initial data
+          await setDoc(userStatsRef, initialStats);
+          console.log('User stats initialized successfully');
+          return initialStats;
+        }
+
+        // If document exists, return existing data
+        return userStatsDoc.data();
+      } catch (error) {
+        if (error.code === 'permission-denied') {
+          console.error('Permission denied while accessing user stats. Retrying initialization...');
+          // Wait a bit and try again (in case of race condition with auth)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return this.initializeUserStats(userId);
+        }
+        throw error;
+      }
     } catch (error) {
       console.error('Error initializing user stats:', error);
-      return null;
+      throw error;
     }
   }
 
@@ -89,30 +123,41 @@ class DashboardService {
     try {
       const batch = writeBatch(db);
       
-      // Initialize user engagement document
+      // Initialize user engagement document if it doesn't exist
       const engagementRef = doc(collection(db, 'userEngagement'), userId);
-      batch.set(engagementRef, {
-        userId: userId,
-        impressions: 0,
-        interactions: 0,
-        shares: 0,
-        comments: 0,
-        lastUpdated: serverTimestamp()
-      }, { merge: true });
+      const engagementDoc = await getDoc(engagementRef);
+      if (!engagementDoc.exists()) {
+        batch.set(engagementRef, {
+          userId: userId,
+          impressions: 0,
+          interactions: 0,
+          shares: 0,
+          comments: 0,
+          lastUpdated: serverTimestamp()
+        });
+      }
 
-      // Initialize user trends document
+      // Initialize user trends document if it doesn't exist
       const trendsRef = doc(collection(db, 'trends'), userId);
-      batch.set(trendsRef, {
-        userId: userId,
-        lastUpdated: serverTimestamp()
-      }, { merge: true });
+      const trendsDoc = await getDoc(trendsRef);
+      if (!trendsDoc.exists()) {
+        batch.set(trendsRef, {
+          userId: userId,
+          trends: [],
+          lastUpdated: serverTimestamp()
+        });
+      }
 
-      // Initialize user content ideas document
+      // Initialize user content ideas document if it doesn't exist
       const ideasRef = doc(collection(db, 'contentIdeas'), userId);
-      batch.set(ideasRef, {
-        userId: userId,
-        lastUpdated: serverTimestamp()
-      }, { merge: true });
+      const ideasDoc = await getDoc(ideasRef);
+      if (!ideasDoc.exists()) {
+        batch.set(ideasRef, {
+          userId: userId,
+          ideas: [],
+          lastUpdated: serverTimestamp()
+        });
+      }
 
       await batch.commit();
     } catch (error) {
@@ -327,6 +372,7 @@ class DashboardService {
   // Save a new idea directly
   async saveIdea(userId, ideaData) {
     try {
+      // Filter out any undefined values before saving
       const savedIdeaData = {
         userId,
         title: ideaData.title || 'New Idea',
@@ -338,9 +384,13 @@ class DashboardService {
         updatedAt: serverTimestamp(),
         type: ideaData.type || 'Content',
         difficulty: ideaData.difficulty || 'Medium',
-        outline: ideaData.outline || [],
-        modalContent: ideaData.modalContent // Include the modalContent
+        outline: ideaData.outline || []
       };
+
+      // Only add modalContent if it exists
+      if (ideaData.modalContent) {
+        savedIdeaData.modalContent = ideaData.modalContent;
+      }
 
       // Add to savedIdeas collection
       const docRef = await addDoc(collection(db, 'savedIdeas'), savedIdeaData);
@@ -348,7 +398,7 @@ class DashboardService {
       // Update user stats
       const userStatsRef = doc(db, 'userStats', userId);
       await updateDoc(userStatsRef, {
-        totalSavedIdeas: increment(1),
+        'savedIdeas.total': increment(1),
         lastUpdated: serverTimestamp()
       });
 
@@ -452,113 +502,130 @@ class DashboardService {
   subscribeToStats(userId, callback) {
     try {
       // Initialize user stats first
-      this.initializeUserStats(userId);
+      this.initializeUserStats(userId).then((initialStats) => {
+        if (initialStats) {
+          // Set initial platform status from stored data
+          this.platformStatus = initialStats.platforms || this.platformStatus;
+          this.activeTrendsCount = initialStats.activeTrendsCount || 0;
 
-      // Subscribe to user stats with real-time updates
-      const userStatsListener = onSnapshot(
-        doc(db, 'userStats', userId),
-        {
-          next: (doc) => {
-            if (doc.exists()) {
-              const data = doc.data();
-              this.userStats.set(userId, data);
-              
-              // Calculate real-time metrics
-              const realtimeStats = this.calculateRealtimeStats(data);
-              callback({
-                type: 'userStats',
-                data: realtimeStats
-              });
-            } else {
-              // If document doesn't exist, initialize it
-              this.initializeUserStats(userId);
-            }
-          },
-          error: (error) => {
-            console.error('Error in user stats subscription:', error);
-            callback({
-              type: 'error',
-              data: { message: 'Error fetching user stats' }
-            });
-          }
+          // Send initial stats
+          callback({
+            type: 'userStats',
+            data: this.calculateRealtimeStats(initialStats)
+          });
         }
-      );
 
-      // Subscribe to saved ideas with real-time updates
-      const ideasListener = onSnapshot(
-        query(
-          collection(db, 'savedIdeas'),
-          where('userId', '==', userId)
-        ),
-        {
-          next: async (snapshot) => {
-            try {
-              const ideas = snapshot.docs.map(doc => {
+        // Subscribe to user stats with real-time updates
+        const userStatsListener = onSnapshot(
+          doc(db, 'userStats', userId),
+          {
+            next: (doc) => {
+              if (doc.exists()) {
                 const data = doc.data();
-                return {
-                  id: doc.id,
-                  title: data.title || 'New Saved Idea',
-                  platform: data.platform || 'All Platforms',
-                  category: data.category || 'General',
-                  createdAt: data.createdAt?.toDate() || new Date(),
-                  description: data.description || '',
-                  status: data.status || 'Saved'
-                };
-              });
-
-              // Sort in memory instead of using orderBy
-              ideas.sort((a, b) => b.createdAt - a.createdAt);
-
-              const savedIdeasStats = {
-                totalIdeas: ideas.length,
-                monthlyGrowth: this.calculateMonthlyGrowth(ideas),
-                topPlatforms: this.getTopPlatforms(ideas),
-                recentIdeas: ideas.slice(0, 5).map(idea => ({
-                  title: idea.title,
-                  platform: idea.platform,
-                  category: idea.category,
-                  createdAt: idea.createdAt,
-                  status: idea.status
-                }))
-              };
-              
-              // Validate data before updating
-              const updateData = {
-                totalSavedIdeas: savedIdeasStats.totalIdeas,
-                monthlyGrowthRate: savedIdeasStats.monthlyGrowth,
-                lastUpdated: serverTimestamp()
-              };
-
-              if (savedIdeasStats.recentIdeas.length > 0) {
-                updateData.recentSavedIdeas = savedIdeasStats.recentIdeas;
+                this.userStats.set(userId, data);
+                
+                // Update local tracking
+                this.platformStatus = data.platforms || this.platformStatus;
+                this.activeTrendsCount = data.activeTrendsCount || 0;
+                
+                // Send stats update
+                callback({
+                  type: 'userStats',
+                  data: this.calculateRealtimeStats(data)
+                });
               }
-
-              // Update user stats with validated data
-              await updateDoc(doc(db, 'userStats', userId), updateData);
-
-              callback({
-                type: 'content',
-                data: savedIdeasStats
-              });
-            } catch (error) {
-              console.error('Error processing saved ideas:', error);
+            },
+            error: (error) => {
+              console.error('Error in user stats subscription:', error);
               callback({
                 type: 'error',
-                data: { message: 'Error processing saved ideas: ' + error.message }
+                data: { message: 'Error fetching user stats' }
               });
             }
           }
-        }
-      );
+        );
 
-      // Store all listeners for cleanup
-      this.listeners.set(userId, [
-        userStatsListener,
-        ideasListener
-      ]);
+        // Subscribe to saved ideas with real-time updates
+        const ideasListener = onSnapshot(
+          query(
+            collection(db, 'savedIdeas'),
+            where('userId', '==', userId)
+          ),
+          {
+            next: async (snapshot) => {
+              try {
+                const ideas = snapshot.docs.map(doc => {
+                  const data = doc.data();
+                  return {
+                    id: doc.id,
+                    title: data.title || 'New Saved Idea',
+                    platform: data.platform || 'All Platforms',
+                    category: data.category || 'General',
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                    description: data.description || '',
+                    status: data.status || 'Saved'
+                  };
+                });
 
-      // Start activity tracking
-      this.startActivityTracking(userId);
+                // Update user stats with saved ideas
+                const userStatsRef = doc(db, 'userStats', userId);
+                await updateDoc(userStatsRef, {
+                  'savedIdeas.total': ideas.length,
+                  'savedIdeas.items': ideas,
+                  lastUpdated: serverTimestamp()
+                });
+
+                // Send content update
+                callback({
+                  type: 'content',
+                  data: {
+                    totalIdeas: ideas.length,
+                    monthlyGrowth: this.calculateMonthlyGrowth(ideas),
+                    topPlatforms: this.getTopPlatforms(ideas),
+                    recentIdeas: ideas.slice(0, 5)
+                  }
+                });
+              } catch (error) {
+                console.error('Error processing saved ideas:', error);
+                callback({
+                  type: 'error',
+                  data: { message: 'Error processing saved ideas: ' + error.message }
+                });
+              }
+            }
+          }
+        );
+
+        // Subscribe to trends
+        const trendsListener = onSnapshot(
+          doc(db, 'trends', userId),
+          {
+            next: async (docSnapshot) => {
+              if (docSnapshot.exists()) {
+                const data = docSnapshot.data();
+                const trends = data.trends || [];
+                
+                // Update active trends count
+                const userStatsRef = doc(db, 'userStats', userId);
+                await updateDoc(userStatsRef, {
+                  activeTrendsCount: trends.length,
+                  lastUpdated: serverTimestamp()
+                });
+              }
+            }
+          }
+        );
+
+        // Store all listeners for cleanup
+        this.listeners.set(userId, [
+          userStatsListener,
+          ideasListener,
+          trendsListener
+        ]);
+
+        // Start activity tracking
+        this.startActivityTracking(userId);
+      });
     } catch (error) {
       console.error('Error setting up subscriptions:', error);
       callback({
@@ -582,27 +649,194 @@ class DashboardService {
     this.listeners.set(userId + '_activity', activityInterval);
   }
 
-  // Enhanced unsubscribe method
+  // Enhanced unsubscribe method with immediate cleanup
   unsubscribeFromStats(userId) {
-    // Clear all Firestore listeners
-    const userListeners = this.listeners.get(userId);
-    if (userListeners) {
-      userListeners.forEach(listener => listener());
-      this.listeners.delete(userId);
+    const logPrefix = '📊 [DashboardService]';
+    console.group(`${logPrefix} Unsubscribing user: ${userId}`);
+
+    if (!userId) {
+      console.warn(`${logPrefix} No userId provided for unsubscribe`);
+      console.groupEnd();
+      return;
     }
 
-    // Clear activity tracking interval
-    const activityInterval = this.listeners.get(userId + '_activity');
-    if (activityInterval) {
-      clearInterval(activityInterval);
-      this.listeners.delete(userId + '_activity');
-    }
+    // Step 1: Clear all intervals and timeouts
+    console.group(`${logPrefix} Step 1: Clearing timers`);
+    try {
+      if (this.updateTimeout) {
+        clearTimeout(this.updateTimeout);
+        this.updateTimeout = null;
+        console.log(`${logPrefix} Cleared update timeout`);
+      }
 
-    // Final activity update
-    this.trackUserActivity(userId, 'SessionEnd', {
-      timestamp: new Date(),
-      sessionDuration: this.calculateSessionDuration(this.userStats.get(userId)?.currentSessionStart)
-    });
+      const activityInterval = this.listeners.get(userId + '_activity');
+      if (activityInterval) {
+        clearInterval(activityInterval);
+        this.listeners.delete(userId + '_activity');
+        console.log(`${logPrefix} Cleared activity interval`);
+      }
+
+      if (this.trendUpdateInterval) {
+        clearInterval(this.trendUpdateInterval);
+        this.trendUpdateInterval = null;
+        console.log(`${logPrefix} Cleared trend update interval`);
+      }
+    } catch (error) {
+      console.warn(`${logPrefix} Error clearing timers:`, error.message);
+    }
+    console.groupEnd();
+
+    // Step 2: Clear all Firestore listeners
+    console.group(`${logPrefix} Step 2: Clearing Firestore listeners`);
+    try {
+      const userListeners = this.listeners.get(userId);
+      if (userListeners) {
+        userListeners.forEach((listener, index) => {
+          try {
+            listener();
+            console.log(`${logPrefix} Unsubscribed listener ${index + 1}/${userListeners.length}`);
+          } catch (error) {
+            console.warn(`${logPrefix} Error unsubscribing listener ${index + 1}:`, error.message);
+          }
+        });
+        this.listeners.delete(userId);
+        console.log(`${logPrefix} Cleared all user listeners`);
+      }
+
+      const savedIdeasListener = this.listeners.get(userId + '_savedIdeas');
+      if (savedIdeasListener) {
+        try {
+          savedIdeasListener();
+          this.listeners.delete(userId + '_savedIdeas');
+          console.log(`${logPrefix} Unsubscribed from saved ideas`);
+        } catch (error) {
+          console.warn(`${logPrefix} Error unsubscribing from saved ideas:`, error.message);
+        }
+      }
+    } catch (error) {
+      console.warn(`${logPrefix} Error clearing Firestore listeners:`, error.message);
+    }
+    console.groupEnd();
+
+    // Step 3: Clear local state
+    console.group(`${logPrefix} Step 3: Clearing local state`);
+    try {
+      this.userStats.delete(userId);
+      this.activityBuffer.delete(userId);
+      console.log(`${logPrefix} Cleared user stats and activity buffer`);
+    } catch (error) {
+      console.warn(`${logPrefix} Error clearing local state:`, error.message);
+    }
+    console.groupEnd();
+
+    console.log(`${logPrefix} Successfully completed unsubscribe process ✅`);
+    console.groupEnd();
+  }
+
+  // Comprehensive cleanup method
+  async cleanup() {
+    const logPrefix = '🧹 [Cleanup]';
+    console.group(`${logPrefix} Starting comprehensive cleanup...`);
+
+    try {
+      // Step 1: Stop trend monitoring
+      console.group(`${logPrefix} Step 1: Stopping trend monitoring`);
+      try {
+        this.stopTrendMonitoring();
+        console.log(`${logPrefix} Trend monitoring stopped`);
+      } catch (error) {
+        console.warn(`${logPrefix} Error stopping trend monitoring:`, error.message);
+      }
+      console.groupEnd();
+
+      // Step 2: Unsubscribe all users
+      console.group(`${logPrefix} Step 2: Unsubscribing users`);
+      try {
+        const userIds = Array.from(this.listeners.keys())
+          .filter(key => !key.includes('_'));
+        
+        console.log(`${logPrefix} Found ${userIds.length} users to unsubscribe`);
+        
+        for (const userId of userIds) {
+          try {
+            this.unsubscribeFromStats(userId);
+            console.log(`${logPrefix} Unsubscribed user: ${userId}`);
+          } catch (error) {
+            console.warn(`${logPrefix} Error unsubscribing user ${userId}:`, error.message);
+          }
+        }
+      } catch (error) {
+        console.warn(`${logPrefix} Error during user unsubscribe:`, error.message);
+      }
+      console.groupEnd();
+
+      // Step 3: Final state reset
+      console.group(`${logPrefix} Step 3: Resetting service state`);
+      try {
+        this.listeners.clear();
+        this.userStats.clear();
+        this.activityBuffer.clear();
+        this.trendUpdateCallbacks.clear();
+        
+        this.platformStatus = {
+          active: 0,
+          connected: [],
+          platforms: {
+            twitter: false,
+            reddit: false,
+            youtube: false,
+            instagram: false,
+            tiktok: false,
+            linkedin: false,
+            github: false
+          }
+        };
+
+        this.activeTrendsCount = 0;
+        console.log(`${logPrefix} Service state reset complete`);
+      } catch (error) {
+        console.warn(`${logPrefix} Error resetting service state:`, error.message);
+      }
+      console.groupEnd();
+
+      console.log(`${logPrefix} Cleanup completed successfully ✅`);
+    } catch (error) {
+      console.error(`${logPrefix} Critical error during cleanup:`, error.message);
+    }
+    console.groupEnd();
+  }
+
+  // Stop monitoring trends synchronously
+  stopTrendMonitoring() {
+    try {
+      console.log('Stopping trend monitoring');
+      
+      if (this.trendUpdateInterval) {
+        clearInterval(this.trendUpdateInterval);
+        this.trendUpdateInterval = null;
+      }
+
+      this.trendUpdateCallbacks.clear();
+      this.activeTrendsCount = 0;
+      
+      this.platformStatus = {
+        active: 0,
+        connected: [],
+        platforms: {
+          twitter: false,
+          reddit: false,
+          youtube: false,
+          instagram: false,
+          tiktok: false,
+          linkedin: false,
+          github: false
+        }
+      };
+
+      console.log('Successfully stopped trend monitoring');
+    } catch (error) {
+      console.warn('Error stopping trend monitoring:', error);
+    }
   }
 
   calculateTrendStats(trends) {
@@ -1128,14 +1362,6 @@ class DashboardService {
     };
   }
 
-  // Stop monitoring trends
-  stopTrendMonitoring() {
-    if (this.trendUpdateInterval) {
-      clearInterval(this.trendUpdateInterval);
-      this.trendUpdateInterval = null;
-    }
-  }
-
   // Subscribe to trend updates
   subscribeToTrendUpdates(callback) {
     this.trendUpdateCallbacks.add(callback);
@@ -1175,7 +1401,17 @@ class DashboardService {
           platforms
         };
 
-        // Notify all subscribers with combined update
+        // Update stats in Firestore for all active users
+        this.userStats.forEach(async (_, userId) => {
+          const userStatsRef = doc(db, 'userStats', userId);
+          await updateDoc(userStatsRef, {
+            activeTrendsCount: this.activeTrendsCount,
+            platforms: this.platformStatus,
+            lastUpdated: serverTimestamp()
+          });
+        });
+
+        // Notify all subscribers
         this.trendUpdateCallbacks.forEach(callback => {
           callback({
             activeTrends: this.activeTrendsCount || 0,
@@ -1189,7 +1425,6 @@ class DashboardService {
       }
     } catch (error) {
       console.error('Error updating active trends:', error);
-      // Send default values in case of error
       this.trendUpdateCallbacks.forEach(callback => {
         callback({
           activeTrends: 0,
@@ -1200,6 +1435,31 @@ class DashboardService {
           }
         });
       });
+    }
+  }
+
+  // Update platform connection status with persistence
+  async updatePlatformStatus(userId, platform, isConnected) {
+    try {
+      const userStatsRef = doc(db, 'userStats', userId);
+      
+      // Update platforms in user stats
+      await updateDoc(userStatsRef, {
+        [`platforms.platforms.${platform}`]: isConnected,
+        'platforms.active': isConnected ? increment(1) : increment(-1),
+        lastUpdated: serverTimestamp()
+      });
+
+      // Update local tracking
+      this.platformStatus.platforms[platform] = isConnected;
+      this.platformStatus.active = Object.values(this.platformStatus.platforms).filter(Boolean).length;
+      this.platformStatus.connected = Object.entries(this.platformStatus.platforms)
+        .filter(([_, isActive]) => isActive)
+        .map(([platform]) => platform.charAt(0).toUpperCase() + platform.slice(1));
+
+    } catch (error) {
+      console.error('Error updating platform status:', error);
+      throw error;
     }
   }
 }

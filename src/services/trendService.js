@@ -149,28 +149,27 @@ class TrendService {
   // Add authentication method
   async ensureAuthentication() {
     try {
-      // Check if there's already a user
+      // Check if user is already authenticated
       if (auth.currentUser) {
-        return;
+        console.log('User is already authenticated:', auth.currentUser.uid);
+        return auth.currentUser;
       }
 
-      // Try to sign in anonymously
+      // If anonymous auth is not needed, just return null or handle accordingly
+      console.log('No authenticated user. Please sign in to access features.');
+      return null;
+
+      // Removed anonymous authentication attempt since it's disabled
+      /* 
       try {
-        await signInAnonymously(auth);
+        const userCredential = await signInAnonymously(auth);
         console.log('Anonymous authentication successful');
+        return userCredential.user;
       } catch (error) {
-        // Handle specific Firebase auth errors
-        if (error.code === 'auth/admin-restricted-operation') {
-          console.error('Anonymous authentication is not enabled in Firebase. Please enable it in the Firebase Console.');
-          throw new Error('Anonymous authentication is not enabled. Please contact the administrator.');
-        } else if (error.code === 'auth/operation-not-allowed') {
-          console.error('The sign-in provider is disabled for this Firebase project.');
-          throw new Error('Authentication provider is disabled. Please contact the administrator.');
-        } else {
-          console.error('Firebase authentication error:', error);
-          throw new Error('Authentication failed. Please try again later.');
-        }
+        console.error('Anonymous authentication is not enabled in Firebase. Please enable it in the Firebase Console.');
+        throw new Error('Anonymous authentication is not enabled. Please contact the administrator.');
       }
+      */
     } catch (error) {
       console.error('Authentication error:', error);
       throw error;
@@ -531,6 +530,16 @@ class TrendService {
   // Get all platform trends with enhanced data
   async getAllPlatformTrends() {
     try {
+      const user = await this.ensureAuthentication();
+      
+      // If no authenticated user, return empty trends
+      if (!user) {
+        return {
+          trends: {},
+          message: 'Authentication required to view trends'
+        };
+      }
+
       // Get trends from all platforms in parallel with proper error handling
       const results = await Promise.allSettled([
         this.getNewsTrends(),
