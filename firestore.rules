@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasUserId(data) {
+      return data.userId == request.auth.uid;
+    }
+
+    // User data collection
+    match /users/{userId} {
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow read, update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // User stats collection
+    match /userStats/{userId} {
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow read, update: if isOwner(userId);
+      allow write: if !exists(/databases/$(database)/documents/userStats/$(userId)) 
+                  && isAuthenticated() 
+                  && request.auth.uid == userId
+                  && hasUserId(request.resource.data);
+    }
+
+    // Saved ideas collection
+    match /savedIdeas/{ideaId} {
+      allow read: if isAuthenticated() && (
+        !exists(/databases/$(database)/documents/savedIdeas/$(ideaId)) ||
+        resource.data.userId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow list: if isAuthenticated() && request.query.limit <= 100;
+    }
+
+    // Trends collection
+    match /trends/{trendId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Trend activities collection
+    match /trendActivities/{activityId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Content ideas collection
+    match /contentIdeas/{ideaId} {
+      allow read: if isAuthenticated() && (
+        !exists(resource) || resource.data.userId == request.auth.uid
+      );
+      allow create: if isAuthenticated() 
+                   && request.resource.data.userId == request.auth.uid
+                   && hasUserId(request.resource.data);
+      allow update: if isAuthenticated() 
+                   && resource.data.userId == request.auth.uid
+                   && hasUserId(request.resource.data);
+    }
+
+    // User engagement collection
+    match /userEngagement/{userId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() 
+                   && request.auth.uid == userId
+                   && hasUserId(request.resource.data);
+      allow update: if isAuthenticated() 
+                   && isOwner(userId)
+                   && hasUserId(request.resource.data);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 
