@@ -6,11 +6,12 @@ import Register from '../components/auth/Register';
 import Landing from '../pages/Landing';
 import Home from '../pages/Home';
 import TrendAnalysis from '../pages/TrendAnalysis';
-import News from '../pages/News';
 import Settings from '../pages/Settings';
 import TrendDetailPage from '../pages/TrendDetailPage';
 import AIContentChat from '../pages/AIContentChat';
 import SavedIdeas from '../pages/SavedIdeas';
+import NewsPage from '../components/news/NewsPage';
+import NewsDetail from '../components/news/NewsDetail';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -84,7 +85,8 @@ function AppRoutes() {
         <Route index element={<Home />} />
         <Route path="trends" element={<TrendAnalysis />} />
         <Route path="trend/:trendName" element={<TrendDetailPage />} />
-        <Route path="news" element={<News />} />
+        <Route path="news" element={<NewsPage />} />
+        <Route path="news/:id" element={<NewsDetail />} />
         <Route path="chat" element={<AIContentChat />} />
         <Route path="settings" element={<Settings />} />
         <Route path="saved-ideas" element={<SavedIdeas />} />
