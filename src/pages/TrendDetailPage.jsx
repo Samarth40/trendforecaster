@@ -7,6 +7,8 @@ import { Line } from 'react-chartjs-2';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../config/firebase';
 import { dashboardService } from '../services/dashboardService';
+import { toast } from 'react-toastify';
+import { Bookmark } from 'lucide-react';
 
 const TrendDetailPage = () => {
   const location = useLocation();
@@ -23,6 +25,7 @@ const TrendDetailPage = () => {
   const [selectedIdea, setSelectedIdea] = useState(null);
   const [activePlatform, setActivePlatform] = useState('Instagram');
   const [user] = useAuthState(auth);
+  const [savedIdeas, setSavedIdeas] = useState(new Set());
 
   useEffect(() => {
     if (!trend && trendName) {
@@ -33,6 +36,26 @@ const TrendDetailPage = () => {
       handleGenerateSummary();
     }
   }, [trendName, trend]);
+
+  useEffect(() => {
+    if (user) {
+      const unsubscribe = dashboardService.subscribeToSavedIdeas(user.uid, (update) => {
+        if (update.type === 'success') {
+          const savedIdeaIds = new Set(update.data.map(idea => idea.title));
+          setSavedIdeas(savedIdeaIds);
+        }
+      });
+
+      // Return cleanup function
+      return () => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+        // Also unsubscribe from saved ideas
+        dashboardService.unsubscribeFromSavedIdeas(user.uid);
+      };
+    }
+  }, [user]);
 
   const fetchTrendData = async () => {
     setLoading(true);
@@ -171,172 +194,177 @@ const TrendDetailPage = () => {
 
   const handleSaveIdea = async (idea) => {
     if (!user) {
-      alert('Please sign in to save ideas');
+      toast.error('Please sign in to save ideas');
       return;
     }
 
+    const isAlreadySaved = savedIdeas.has(idea.title);
+    const toastId = isAlreadySaved ? 'deleting-idea' : 'saving-idea';
+    
     try {
-      // Debug logging
-      console.log('Original idea data:', idea);
-
-      // Create modal content based on idea type
-      const modalContent = {
-        overview: idea.description,
-        type: idea.type?.toLowerCase() || 'content',
-        content: {}
-      };
-
-      // Add content based on type
-      if (idea.type?.toLowerCase().includes('video') || idea.type?.toLowerCase().includes('youtube')) {
-        modalContent.content.video = {
-          sections: idea.outline?.map((section, index) => ({
-            title: section,
-            content: {
-              visual: index === 0 
-                ? `Welcome back to [Channel Name], today we're diving deep into ${trend.name}.`
-                : index === 1
-                ? "Let's analyze the key aspects of this situation:"
-                : index === 2
-                ? "Based on our analysis, here are the key findings:"
-                : "To wrap things up, here's what you need to know:",
-              audio: index === 0 
-                ? `WAIT! Stop scrolling! This trend in ${trend.category}...`
-                : index === 1
-                ? `Here's what's happening with ${trend.name}...`
-                : index === 2
-                ? `The impact on ${trend.category} is HUGE...`
-                : `Experts predict this will transform...`,
-              overlay: index === 0 
-                ? `${trend.growth}% GROWTH 📈`
-                : index === 1
-                ? "MASSIVE ENGAGEMENT 🔥"
-                : index === 2
-                ? "WHY IT MATTERS ⚡"
-                : "INDUSTRY CHANGING 🚀"
-            }
-          })),
-          productionNotes: {
-            duration: "60 seconds maximum",
-            aspectRatio: "9:16 vertical format",
-            style: "Fast-paced, dynamic transitions",
-            music: "Upbeat, trending background track",
-            captions: "Auto-generated + manual review",
-            graphics: "Trending style animations and effects"
-          }
-        };
-      } else if (idea.type?.toLowerCase().includes('article')) {
-        modalContent.content.article = {
-          sections: idea.outline?.map((section, index) => ({
-            title: section,
-            content: index === 0 
-              ? `In a significant development that's capturing attention across ${trend.category}, ${trend.name} has emerged as a pivotal moment. This comprehensive analysis explores the implications and what it means for all stakeholders involved.`
-              : index === 1
-              ? `The key aspects of this development include:\n• Detailed analysis of the trend's growth (${trend.growth}% increase)\n• Impact on ${trend.category} landscape\n• Stakeholder perspectives and reactions`
-              : index === 2
-              ? `With ${(trend.volume || trend.views || 0).toLocaleString()} engagements, this trend demonstrates significant market interest. Expert analysis suggests [key insights and implications for the industry].`
-              : `As this situation continues to evolve, the implications for ${trend.category} are clear. Stakeholders should monitor these developments closely as they shape the future landscape of the industry.`
-          }))
-        };
-      } else if (idea.type?.toLowerCase().includes('podcast')) {
-        modalContent.content.podcast = {
-          sections: idea.outline?.map((section, index) => ({
-            title: section,
-            content: index === 0
-              ? `Welcome back to [Podcast Name]! Today we're diving deep into a fascinating trend in ${trend.category}: ${trend.name}.`
-              : index === 1
-              ? `Let's break down the numbers: We're seeing a ${trend.growth}% growth rate and ${(trend.volume || trend.views || 0).toLocaleString()} engagements.`
-              : index === 2
-              ? `The implications for ${trend.category} are significant. Industry experts suggest this could revolutionize how we approach...`
-              : `To wrap up our discussion on ${trend.name}, let's talk about what this means for the future...`
-          })),
-          productionNotes: {
-            duration: "30-45 minutes",
-            format: "Interview style with expert insights",
-            segments: [
-              "Trend Introduction (5 mins)",
-              "Data Analysis (10 mins)",
-              "Expert Interview (20 mins)",
-              "Future Implications (10 mins)"
-            ],
-            technicalRequirements: {
-              audio: "High-quality stereo recording",
-              editing: "Professional intro/outro music",
-              distribution: "All major podcast platforms"
-            }
-          }
-        };
-      } else if (idea.type?.toLowerCase().includes('post') || 
-                 idea.recommendedPlatforms?.some(p => 
-                   ['instagram', 'facebook', 'twitter', 'linkedin', 'threads'].includes(p.toLowerCase())
-                 )) {
-        modalContent.content.social = {
-          instagram: {
-            caption: `✨ Breaking Trends Alert! 📱\n\n🔍 ${trend.name}\n\n📊 Key Insights:\n• 📈 ${trend.growth}% Growth\n• 🎯 Impact: ${trend.category}\n• 👥 ${(trend.volume || trend.views || 0).toLocaleString()} Engagements\n\n💡 What are your thoughts on this trend?\n\n👇 Share your perspective in the comments!\n\n.\n.\n.`,
-            hashtags: `#trending #${trend.category.replace(/\s+/g, '')} ${trend.keywords?.map(k => `#${k.replace(/\s+/g, '')}`).join(' ')} #trendalert #trendwatch #innovation #growth`
-          },
-          twitter: {
-            thread: [
-              `🚨 Breaking: ${trend.name}`,
-              `Here's what you need to know 🧵👇`,
-              `📊 The numbers:\n• ${trend.growth}% growth rate\n• ${(trend.volume || trend.views || 0).toLocaleString()} engagements\n• Significant impact on ${trend.category}`,
-              `💡 Key takeaway: This trend represents a major shift in how we approach ${trend.category}.`,
-              `🔄 RT & Follow for more trend insights!`
-            ],
-            hashtags: `$trend #${trend.category.replace(/\s+/g, '')}Trends #TrendAlert ${trend.keywords?.slice(0, 2).map(k => `#${k.replace(/\s+/g, '')}`).join(' ')}`
-          },
-          threads: {
-            thread: [
-              `🌟 Trend Spotlight: ${trend.name}`,
-              `Let's dive into why this matters for ${trend.category} 🔍`,
-              `📈 Growth Metrics:\n• ${trend.growth}% increase in adoption\n• ${(trend.volume || trend.views || 0).toLocaleString()} community engagements\n• Rising interest in ${trend.category}`,
-              `🎯 Impact Analysis:\n• Transforming ${trend.category}\n• Creating new opportunities\n• Driving innovation`,
-              `💫 What's Next:\n• Expected continued growth\n• Emerging use cases\n• Industry adaptation`,
-              `Join the conversation! What's your take on this trend? 💭`
-            ],
-            hashtags: `#${trend.category.replace(/\s+/g, '')}Trends #Innovation #FutureOfTech ${trend.keywords?.slice(0, 2).map(k => `#${k.replace(/\s+/g, '')}`).join(' ')}`
-          },
-          linkedin: {
-            article: `📊 Industry Insight: ${trend.name}\n\nI'm excited to share a significant trend that's reshaping ${trend.category}.\n\nKey Findings:\n\n📈 Growth: ${trend.growth}% increase\n🎯 Market Impact: ${(trend.volume || trend.views || 0).toLocaleString()} engagements\n💡 Industry Implications: Transforming how we approach ${trend.category}\n\nWhat are your thoughts on this development? How do you see it impacting our industry?\n\nLet's discuss in the comments below. 👇`,
-            hashtags: `#Innovation #${trend.category.replace(/\s+/g, '')} #ProfessionalDevelopment ${trend.keywords?.slice(0, 3).map(k => `#${k.replace(/\s+/g, '')}`).join(' ')} #IndustryTrends #Business`
-          }
-        };
-      }
-
-      // Debug logging
-      console.log('Generated modal content:', modalContent);
-
-      // Prepare the complete idea data
-      const ideaData = {
-        userId: user.uid,
-        title: idea.title,
-        type: idea.type || 'Content',
-        difficulty: idea.difficulty || 'Medium',
-        description: idea.description,
-        platform: idea.recommendedPlatforms?.[0] || 'All Platforms',
-        category: trend.category,
-        status: 'New',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        outline: idea.outline || [],
-        modalContent: modalContent // Ensure modalContent is included in the root level
-      };
-
-      // Final debug logging
-      console.log('Final idea data to be saved:', ideaData);
-
-      // Save to Firebase
-      await dashboardService.saveIdea(user.uid, ideaData);
-      console.log('Idea saved successfully');
-      alert('Content idea saved successfully!');
-    } catch (error) {
-      console.error('Error saving idea:', {
-        error,
-        message: error.message,
-        stack: error.stack,
-        idea,
-        trend
+      // Show loading toast immediately
+      toast.loading(isAlreadySaved ? 'Removing from saved...' : 'Saving idea...', { 
+        toastId 
       });
-      alert(`Failed to save idea: ${error.message}`);
+
+      if (isAlreadySaved) {
+        // Find and delete the saved idea
+        const savedIdea = await dashboardService.findSavedIdeaByTitle(user.uid, idea.title);
+        if (savedIdea) {
+          await dashboardService.deleteSavedIdea(user.uid, savedIdea.id);
+          setSavedIdeas(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(idea.title);
+            return newSet;
+          });
+          toast.update(toastId, {
+            render: 'Removed from saved ideas',
+            type: 'success',
+            isLoading: false,
+            autoClose: 2000
+          });
+        }
+      } else {
+        // Create modal content based on idea type
+        const modalContent = {
+          overview: idea.description,
+          type: idea.type?.toLowerCase() || 'content',
+          content: {}
+        };
+
+        // Add content based on type
+        if (idea.type?.toLowerCase().includes('video') || idea.type?.toLowerCase().includes('youtube')) {
+          modalContent.content.video = {
+            sections: idea.outline?.map((section, index) => ({
+              title: section,
+              content: {
+                visual: index === 0 
+                  ? `Welcome back to [Channel Name], today we're diving deep into ${trend.name}.`
+                  : index === 1
+                  ? "Let's analyze the key aspects of this situation:"
+                  : index === 2
+                  ? "Based on our analysis, here are the key findings:"
+                  : "To wrap things up, here's what you need to know:",
+                audio: index === 0 
+                  ? `WAIT! Stop scrolling! This trend in ${trend.category}...`
+                  : index === 1
+                  ? `Here's what's happening with ${trend.name}...`
+                  : index === 2
+                  ? `The impact on ${trend.category} is HUGE...`
+                  : `Experts predict this will transform...`,
+                overlay: index === 0 
+                  ? `${trend.growth}% GROWTH 📈`
+                  : index === 1
+                  ? "MASSIVE ENGAGEMENT 🔥"
+                  : index === 2
+                  ? "WHY IT MATTERS ⚡"
+                  : "INDUSTRY CHANGING 🚀"
+              }
+            }))
+          };
+        } else if (idea.type?.toLowerCase().includes('article')) {
+          modalContent.content.article = {
+            sections: idea.outline?.map((section, index) => ({
+              title: section,
+              content: index === 0 
+                ? `In a significant development that's capturing attention across ${trend.category}, ${trend.name} has emerged as a pivotal moment. This comprehensive analysis explores the implications and what it means for all stakeholders involved.`
+                : index === 1
+                ? `The key aspects of this development include:\n• Detailed analysis of the trend's growth (${trend.growth}% increase)\n• Impact on ${trend.category} landscape\n• Stakeholder perspectives and reactions`
+                : index === 2
+                ? `With ${(trend.volume || trend.views || 0).toLocaleString()} engagements, this trend demonstrates significant market interest. Expert analysis suggests [key insights and implications for the industry].`
+                : `As this situation continues to evolve, the implications for ${trend.category} are clear. Stakeholders should monitor these developments closely as they shape the future landscape of the industry.`
+            }))
+          };
+        } else if (idea.type?.toLowerCase().includes('podcast')) {
+          modalContent.content.podcast = {
+            sections: idea.outline?.map((section, index) => ({
+              title: section,
+              content: index === 0
+                ? `Welcome back to [Podcast Name]! Today we're diving deep into a fascinating trend in ${trend.category}: ${trend.name}.`
+                : index === 1
+                ? `Let's break down the numbers: We're seeing a ${trend.growth}% growth rate and ${(trend.volume || trend.views || 0).toLocaleString()} engagements.`
+                : index === 2
+                ? `The implications for ${trend.category} are significant. Industry experts suggest this could revolutionize how we approach...`
+                : `To wrap up our discussion on ${trend.name}, let's talk about what this means for the future...`
+            })),
+            productionNotes: {
+              duration: "30-45 minutes",
+              format: "Interview style with expert insights",
+              segments: [
+                "Trend Introduction (5 mins)",
+                "Data Analysis (10 mins)",
+                "Expert Interview (20 mins)",
+                "Future Implications (10 mins)"
+              ],
+              technicalRequirements: {
+                audio: "High-quality stereo recording",
+                editing: "Professional intro/outro music",
+                distribution: "All major podcast platforms"
+              }
+            }
+          };
+        } else if (idea.type?.toLowerCase().includes('post') || 
+                   idea.recommendedPlatforms?.some(p => 
+                     ['instagram', 'facebook', 'twitter', 'linkedin', 'threads'].includes(p.toLowerCase())
+                   )) {
+          modalContent.content.social = {
+            instagram: {
+              caption: `✨ Breaking Trends Alert! 📱\n\n🔍 ${trend.name}\n\n📊 Key Insights:\n• 📈 ${trend.growth}% Growth\n• 🎯 Impact: ${trend.category}\n• 👥 ${(trend.volume || trend.views || 0).toLocaleString()} Engagements\n\n💡 What are your thoughts on this trend?\n\n👇 Share your perspective in the comments!\n\n.\n.\n.`,
+              hashtags: `#trending #${trend.category.replace(/\s+/g, '')} ${trend.keywords?.map(k => `#${k.replace(/\s+/g, '')}`).join(' ')} #trendalert #trendwatch #innovation #growth`
+            },
+            twitter: {
+              thread: [
+                `🚨 Breaking: ${trend.name}`,
+                `Here's what you need to know 🧵👇`,
+                `📊 The numbers:\n• ${trend.growth}% growth rate\n• ${(trend.volume || trend.views || 0).toLocaleString()} engagements\n• Significant impact on ${trend.category}`,
+                `💡 Key takeaway: This trend represents a major shift in how we approach ${trend.category}.`,
+                `🔄 RT & Follow for more trend insights!`
+              ],
+              hashtags: `$trend #${trend.category.replace(/\s+/g, '')}Trends #TrendAlert ${trend.keywords?.slice(0, 2).map(k => `#${k.replace(/\s+/g, '')}`).join(' ')}`
+            },
+            threads: {
+              thread: [
+                `🌟 Trend Spotlight: ${trend.name}`,
+                `Let's dive into why this matters for ${trend.category} 🔍`,
+                `📈 Growth Metrics:\n• ${trend.growth}% increase in adoption\n• ${(trend.volume || trend.views || 0).toLocaleString()} community engagements\n• Rising interest in ${trend.category}`,
+                `🎯 Impact Analysis:\n• Transforming ${trend.category}\n• Creating new opportunities\n• Driving innovation`,
+                `💫 What's Next:\n• Expected continued growth\n• Emerging use cases\n• Industry adaptation`,
+                `Join the conversation! What's your take on this trend? 💭`
+              ],
+              hashtags: `#${trend.category.replace(/\s+/g, '')}Trends #Innovation #FutureOfTech ${trend.keywords?.slice(0, 2).map(k => `#${k.replace(/\s+/g, '')}`).join(' ')}`
+            },
+            linkedin: {
+              article: `📊 Industry Insight: ${trend.name}\n\nI'm excited to share a significant trend that's reshaping ${trend.category}.\n\nKey Findings:\n\n📈 Growth: ${trend.growth}% increase\n🎯 Market Impact: ${(trend.volume || trend.views || 0).toLocaleString()} engagements\n💡 Industry Implications: Transforming how we approach ${trend.category}\n\nWhat are your thoughts on this development? How do you see it impacting our industry?\n\nLet's discuss in the comments below. 👇`,
+              hashtags: `#Innovation #${trend.category.replace(/\s+/g, '')} #ProfessionalDevelopment ${trend.keywords?.slice(0, 3).map(k => `#${k.replace(/\s+/g, '')}`).join(' ')} #IndustryTrends #Business`
+            }
+          };
+        }
+
+        // Save the idea
+        await dashboardService.saveIdea(user.uid, {
+          ...idea,
+          modalContent
+        });
+
+        // Update local state immediately
+        setSavedIdeas(prev => new Set([...prev, idea.title]));
+
+        // Update toast to success
+        toast.update(toastId, {
+          render: 'Idea saved successfully!',
+          type: 'success',
+          isLoading: false,
+          autoClose: 2000
+        });
+      }
+    } catch (error) {
+      console.error('Error handling idea:', error);
+      toast.update(toastId, {
+        render: isAlreadySaved ? 'Failed to remove idea' : 'Failed to save idea',
+        type: 'error',
+        isLoading: false,
+        autoClose: 2000
+      });
     }
   };
 
@@ -766,12 +794,18 @@ const TrendDetailPage = () => {
                           </span>
                           <button
                             onClick={() => handleSaveIdea(selectedIdea)}
-                            className="px-4 py-1 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm flex items-center gap-2 transition-colors"
+                            className={`px-4 py-1 rounded-lg text-white text-sm flex items-center gap-2 transition-all duration-200 ${
+                              savedIdeas.has(selectedIdea.title) 
+                                ? 'bg-purple-600 hover:bg-purple-700' 
+                                : 'bg-gray-800 hover:bg-gray-700'
+                            }`}
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Save Idea
+                            <Bookmark 
+                              className={`w-4 h-4 transition-all duration-200 ${
+                                savedIdeas.has(selectedIdea.title) ? 'fill-current' : ''
+                              }`}
+                            />
+                            {savedIdeas.has(selectedIdea.title) ? 'Saved' : 'Save Idea'}
                           </button>
                         </div>
                         <h2 className="text-2xl font-bold text-gray-100 mt-3">

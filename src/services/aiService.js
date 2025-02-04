@@ -5,9 +5,9 @@ class AIService {
     this.openRouterClient = axios.create({
       baseURL: 'https://openrouter.ai/api/v1',
       headers: {
-        'Authorization': `Bearer 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`,
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'TrendForecaster',
+        'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
+        'HTTP-Referer': import.meta.env.VITE_APP_URL || 'http://localhost:3000',
+        'X-Title': import.meta.env.VITE_APP_NAME || 'TrendForecaster',
         'Content-Type': 'application/json'
       }
     });
@@ -22,10 +22,21 @@ class AIService {
             data: error.response.data,
             headers: error.response.headers
           });
+
+          // Handle specific error cases
+          if (error.response.status === 401) {
+            throw new Error('API key is invalid or missing. Please check your configuration.');
+          } else if (error.response.status === 429) {
+            throw new Error('Rate limit exceeded. Please try again in a few minutes.');
+          } else if (error.response.status === 402) {
+            throw new Error('API quota exceeded. Please try again later.');
+          }
         } else if (error.request) {
           console.error('No response received:', error.request);
+          throw new Error('No response from AI service. Please check your internet connection.');
         } else {
           console.error('Error setting up request:', error.message);
+          throw new Error('Failed to connect to AI service. Please try again.');
         }
         return Promise.reject(error);
       }

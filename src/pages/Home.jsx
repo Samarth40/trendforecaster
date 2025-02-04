@@ -47,10 +47,10 @@ function Home() {
       topPlatforms: [],
       recentIdeas: []
     },
-    engagement: {
-      rate: 0,
-      change: 0,
-      lastUpdate: null
+    platforms: {
+      active: 0,
+      connected: [],
+      platforms: {}
     },
     dailyActivity: {
       count: 0,
@@ -73,27 +73,59 @@ function Home() {
   useEffect(() => {
     if (!user) return;
 
-    let mounted = true;
+    let unsubscribeStats;
+    let unsubscribeTrends;
 
-    // Subscribe to real-time stats
-    dashboardService.subscribeToStats(user.uid, (update) => {
-      if (!mounted) return;
+    const initializeDashboard = async () => {
+      setLoading(true);
+      try {
+        // Start trend monitoring
+        dashboardService.startTrendMonitoring();
 
-      if (update.type === 'error') {
-        setError(update.data.message);
-        return;
+        // Subscribe to trend updates
+        unsubscribeTrends = dashboardService.subscribeToTrendUpdates((update) => {
+          setStats(prev => ({
+            ...prev,
+            trends: {
+              ...prev.trends,
+              activeTrends: update.activeTrends
+            },
+            platforms: {
+              active: update.platforms.active,
+              connected: update.platforms.connected,
+              platforms: update.platforms.platforms
+            }
+          }));
+        });
+
+        // Subscribe to real-time stats
+        unsubscribeStats = dashboardService.subscribeToStats(user.uid, (update) => {
+          if (update.type === 'error') {
+            setError(update.data.message);
+            return;
+          }
+
+          setStats(prev => ({
+            ...prev,
+            [update.type]: update.data
+          }));
+        });
+
+      } catch (error) {
+        console.error('Error initializing dashboard:', error);
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setStats(prev => ({
-        ...prev,
-        [update.type]: update.data
-      }));
-      setLoading(false);
-    });
+    initializeDashboard();
 
     // Cleanup function
     return () => {
-      mounted = false;
+      if (typeof unsubscribeStats === 'function') unsubscribeStats();
+      if (typeof unsubscribeTrends === 'function') unsubscribeTrends();
+      dashboardService.stopTrendMonitoring();
       dashboardService.unsubscribeFromStats(user.uid);
     };
   }, [user]);
@@ -202,7 +234,8 @@ function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="glass-effect rounded-xl p-6"
+          className="glass-effect rounded-xl p-6 cursor-pointer hover:shadow-lg transition-all duration-300"
+          onClick={() => navigate('/dashboard/trends')}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -278,7 +311,7 @@ function Home() {
           </div>
         </motion.div>
 
-        {/* Engagement Stats */}
+        {/* Platform Coverage Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -287,14 +320,14 @@ function Home() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">Engagement Rate</p>
-              <p className="mt-2 text-3xl font-bold text-pink-400">
-                {loading ? '...' : `${stats.engagement.rate}%`}
+              <p className="text-sm font-medium text-gray-400">Platform Coverage</p>
+              <p className="mt-2 text-3xl font-bold text-emerald-400">
+                {loading ? '...' : `${stats.platforms.active}/7`}
               </p>
             </div>
-            <div className="p-3 bg-pink-500 bg-opacity-10 rounded-lg">
+            <div className="p-3 bg-emerald-500 bg-opacity-10 rounded-lg">
               <svg
-                className="w-6 h-6 text-pink-400"
+                className="w-6 h-6 text-emerald-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -303,23 +336,27 @@ function Home() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth="2"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
                 />
               </svg>
             </div>
           </div>
           <div className="mt-4">
-            <div className="flex items-center">
-              <span className={`text-sm font-medium ${stats.engagement.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {loading ? '...' : `${stats.engagement.change.toFixed(1)}%`}
-              </span>
-              <span className="ml-2 text-gray-400 text-sm">change</span>
+            <div className="flex flex-wrap gap-2">
+              {loading ? (
+                <span className="text-sm text-gray-400">Loading platforms...</span>
+              ) : stats.platforms.connected.length > 0 ? (
+                stats.platforms.connected.map((platform) => (
+                  <span
+                    key={platform}
+                    className="px-2 py-1 text-sm font-medium text-emerald-400 bg-emerald-500 bg-opacity-10 rounded-full"
+                  >
+                    {platform}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-gray-400">No active platforms</span>
+              )}
             </div>
           </div>
         </motion.div>

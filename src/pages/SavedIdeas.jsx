@@ -4,6 +4,8 @@ import { auth } from '../config/firebase';
 import { dashboardService } from '../services/dashboardService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bookmark, Search, Filter, Trash2, Edit, X } from 'lucide-react';
+import { toast } from 'react-toastify';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 
 function SavedIdeas() {
   const [user] = useAuthState(auth);
@@ -14,6 +16,8 @@ function SavedIdeas() {
   const [filter, setFilter] = useState('all'); // all, recent, platform
   const [selectedIdea, setSelectedIdea] = useState(null);
   const [activePlatform, setActivePlatform] = useState('Instagram');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [ideaToDelete, setIdeaToDelete] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -64,15 +68,41 @@ function SavedIdeas() {
     return matchesSearch && idea.platform === filter;
   });
 
-  // Handle idea deletion with error handling
-  const handleDelete = async (ideaId) => {
+  // Handle idea deletion with modal
+  const handleDelete = async (idea) => {
+    setIdeaToDelete(idea);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!ideaToDelete) return;
+
     try {
-      console.log('Deleting idea:', ideaId);
-      await dashboardService.deleteSavedIdea(user.uid, ideaId);
-      console.log('Idea deleted successfully');
+      toast.loading('Removing from saved...', { 
+        toastId: 'deleting-idea' 
+      });
+
+      console.log('Deleting idea:', ideaToDelete.id);
+      await dashboardService.deleteSavedIdea(user.uid, ideaToDelete.id);
+      
+      toast.update('deleting-idea', {
+        render: 'Removed from saved ideas',
+        type: 'success',
+        isLoading: false,
+        autoClose: 2000
+      });
+
     } catch (error) {
       console.error('Error deleting idea:', error);
-      setError('Failed to delete idea');
+      toast.update('deleting-idea', {
+        render: 'Failed to remove idea',
+        type: 'error',
+        isLoading: false,
+        autoClose: 2000
+      });
+    } finally {
+      setIsDeleteModalOpen(false);
+      setIdeaToDelete(null);
     }
   };
 
@@ -456,7 +486,7 @@ function SavedIdeas() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDelete(idea.id);
+                        handleDelete(idea);
                       }}
                       className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-gray-100 transition-colors"
                     >
@@ -557,6 +587,16 @@ function SavedIdeas() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setIdeaToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        itemTitle={ideaToDelete?.title || ''}
+      />
     </div>
   );
 }

@@ -18,7 +18,8 @@ import {
   arrayUnion,
   getDoc,
   addDoc,
-  deleteDoc
+  deleteDoc,
+  Timestamp
 } from 'firebase/firestore';
 
 class DashboardService {
@@ -27,6 +28,22 @@ class DashboardService {
     this.userStats = new Map();
     this.activityBuffer = new Map(); // Buffer for batching updates
     this.updateTimeout = null;
+    this.activeTrendsCount = 0;
+    this.trendUpdateCallbacks = new Set();
+    this.trendUpdateInterval = null;
+    this.platformStatus = {
+      active: 0,
+      connected: [],
+      platforms: {
+        twitter: false,
+        reddit: false,
+        youtube: false,
+        instagram: false,
+        tiktok: false,
+        linkedin: false,
+        github: false
+      }
+    };
   }
 
   // Initialize user stats document with all required fields
@@ -200,10 +217,10 @@ class DashboardService {
   // Track user activity
   async trackUserActivity(userId, activityType, data = {}) {
     try {
-      const timestamp = serverTimestamp();
+      const currentTime = new Date();
       const activityData = {
         type: activityType,
-        timestamp,
+        timestamp: currentTime.toISOString(), // Use ISO string for array item
         data: {
           ...data,
           platform: data.platform || 'All Platforms',
@@ -230,13 +247,13 @@ class DashboardService {
         todayStart.setHours(0, 0, 0, 0);
 
         const todayActivities = updatedHistory.filter(
-          activity => activity.timestamp >= todayStart
+          activity => new Date(activity.timestamp) >= todayStart
         ).length;
 
         // Update the document with new activity data
         await updateDoc(userStatsRef, {
           activityHistory: updatedHistory,
-          lastActive: timestamp,
+          lastActive: serverTimestamp(), // Keep serverTimestamp for top-level fields
           dailyActivityCount: todayActivities,
           [`activityCounts.${activityType}`]: increment(1)
         });
@@ -927,26 +944,35 @@ class DashboardService {
         limit(100)
       );
 
-      const savedIdeasListener = onSnapshot(
+      const unsubscribe = onSnapshot(
         savedIdeasQuery,
         {
           next: async (snapshot) => {
             try {
-              const ideas = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate() || new Date(),
-                updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-                title: doc.data().title || 'New Idea',
-                description: doc.data().description || '',
-                platform: doc.data().platform || 'All Platforms',
-                category: doc.data().category || 'General',
-                status: doc.data().status || 'New',
-                type: doc.data().type || 'Content',
-                difficulty: doc.data().difficulty || 'Medium',
-                outline: doc.data().outline || [],
-                modalContent: doc.data().modalContent // Include modalContent in the returned data
-              }));
+              const ideas = snapshot.docs.map(doc => {
+                const data = doc.data();
+                // Safely convert timestamps
+                const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : 
+                                data.createdAt ? new Date(data.createdAt) : new Date();
+                const updatedAt = data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : 
+                                data.updatedAt ? new Date(data.updatedAt) : new Date();
+                
+                return {
+                  id: doc.id,
+                  ...data,
+                  createdAt,
+                  updatedAt,
+                  title: data.title || 'New Idea',
+                  description: data.description || '',
+                  platform: data.platform || 'All Platforms',
+                  category: data.category || 'General',
+                  status: data.status || 'New',
+                  type: data.type || 'Content',
+                  difficulty: data.difficulty || 'Medium',
+                  outline: data.outline || [],
+                  modalContent: data.modalContent
+                };
+              });
 
               // Sort by creation date
               ideas.sort((a, b) => b.createdAt - a.createdAt);
@@ -979,14 +1005,16 @@ class DashboardService {
         }
       );
 
-      // Store listener for cleanup
-      this.listeners.set(userId + '_savedIdeas', savedIdeasListener);
+      // Store listener for cleanup and return unsubscribe function
+      this.listeners.set(userId + '_savedIdeas', unsubscribe);
+      return unsubscribe;
     } catch (error) {
       console.error('Error setting up saved ideas subscription:', error);
       callback({
         type: 'error',
         data: { message: 'Error setting up saved ideas subscription' }
       });
+      return () => {}; // Return empty function if setup fails
     }
   }
 
@@ -1050,6 +1078,128 @@ class DashboardService {
     } catch (error) {
       console.error('Error updating saved idea:', error);
       throw error;
+    }
+  }
+
+  // Find saved idea by title
+  async findSavedIdeaByTitle(userId, title) {
+    try {
+      const savedIdeasRef = collection(db, 'savedIdeas');
+      const q = query(
+        savedIdeasRef,
+        where('userId', '==', userId),
+        where('title', '==', title)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0];
+        return {
+          id: doc.id,
+          ...doc.data()
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error finding saved idea:', error);
+      throw error;
+    }
+  }
+
+  // Start monitoring active trends
+  startTrendMonitoring() {
+    if (this.trendUpdateInterval) {
+      clearInterval(this.trendUpdateInterval);
+    }
+
+    // Initial fetch
+    this.updateActiveTrends();
+
+    // Set up interval for periodic updates (every 5 minutes)
+    this.trendUpdateInterval = setInterval(() => {
+      this.updateActiveTrends();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => {
+      if (this.trendUpdateInterval) {
+        clearInterval(this.trendUpdateInterval);
+        this.trendUpdateInterval = null;
+      }
+    };
+  }
+
+  // Stop monitoring trends
+  stopTrendMonitoring() {
+    if (this.trendUpdateInterval) {
+      clearInterval(this.trendUpdateInterval);
+      this.trendUpdateInterval = null;
+    }
+  }
+
+  // Subscribe to trend updates
+  subscribeToTrendUpdates(callback) {
+    this.trendUpdateCallbacks.add(callback);
+    // Return initial count immediately
+    callback({
+      activeTrends: this.activeTrendsCount,
+      platforms: this.platformStatus
+    });
+
+    return () => {
+      this.trendUpdateCallbacks.delete(callback);
+    };
+  }
+
+  // Update active trends count and platform status
+  async updateActiveTrends() {
+    try {
+      const result = await trendService.getAllPlatformTrends();
+      if (result && result.trends) {
+        // Count all active trends across platforms
+        const allTrends = Object.values(result.trends).flat();
+        this.activeTrendsCount = allTrends.length;
+
+        // Update platform status
+        const platforms = { ...this.platformStatus.platforms };
+        Object.keys(result.trends).forEach(platform => {
+          platforms[platform] = result.trends[platform].length > 0;
+        });
+
+        const connected = Object.entries(platforms)
+          .filter(([_, isActive]) => isActive)
+          .map(([platform]) => platform.charAt(0).toUpperCase() + platform.slice(1));
+
+        this.platformStatus = {
+          active: connected.length,
+          connected,
+          platforms
+        };
+
+        // Notify all subscribers with combined update
+        this.trendUpdateCallbacks.forEach(callback => {
+          callback({
+            activeTrends: this.activeTrendsCount || 0,
+            platforms: {
+              active: this.platformStatus.active || 0,
+              connected: this.platformStatus.connected || [],
+              platforms: this.platformStatus.platforms || {}
+            }
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error updating active trends:', error);
+      // Send default values in case of error
+      this.trendUpdateCallbacks.forEach(callback => {
+        callback({
+          activeTrends: 0,
+          platforms: {
+            active: 0,
+            connected: [],
+            platforms: {}
+          }
+        });
+      });
     }
   }
 }
