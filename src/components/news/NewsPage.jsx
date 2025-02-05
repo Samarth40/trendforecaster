@@ -14,21 +14,44 @@ export default function NewsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [dateFilter, setDateFilter] = useState(1); // Default to 1 day
 
   useEffect(() => {
     fetchNews();
-  }, [category, page]);
+  }, [category, page, dateFilter]);
 
   const fetchNews = async () => {
     try {
       setLoading(true);
       setError(null);
-      const articles = await newsService.getTopNews(category, page);
+      
+      let articles;
+      if (searchQuery) {
+        articles = await newsService.searchNews(searchQuery, page, 20, dateFilter);
+      } else {
+        articles = await newsService.getTopNews(category, page, 20, dateFilter);
+      }
+
+      // Filter out articles with undefined or null properties
+      articles = articles.filter(article => 
+        article.title && 
+        article.description && 
+        article.url
+      );
+
+      if (articles.length === 0 && page === 1) {
+        setError(`No ${category} news found. Please try a different category or search term.`);
+      }
+
       setNews(prev => page === 1 ? articles : [...prev, ...articles]);
-      setHasMore(articles.length === 10);
+      setHasMore(articles.length === 20);
     } catch (err) {
-      setError('Failed to fetch news. Please try again later.');
       console.error('Error fetching news:', err);
+      setError(
+        err.response?.status === 429
+          ? 'Rate limit exceeded. Please try again later.'
+          : 'Failed to fetch news. Please try again later.'
+      );
     } finally {
       setLoading(false);
     }
@@ -40,21 +63,45 @@ export default function NewsPage() {
     try {
       setLoading(true);
       setError(null);
-      const articles = await newsService.searchNews(query);
-      setNews(articles);
-      setHasMore(articles.length === 10);
+      const articles = await newsService.searchNews(query, 1, 20, dateFilter);
+      
+      // Filter out articles with undefined or null properties
+      const validArticles = articles.filter(article => 
+        article.title && 
+        article.description && 
+        article.url
+      );
+
+      if (validArticles.length === 0) {
+        setError('No results found for your search. Please try different keywords.');
+      }
+
+      setNews(validArticles);
+      setHasMore(validArticles.length === 20);
     } catch (err) {
-      setError('Failed to search news. Please try again later.');
       console.error('Error searching news:', err);
+      setError(
+        err.response?.status === 429
+          ? 'Rate limit exceeded. Please try again later.'
+          : 'Failed to search news. Please try again later.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleCategoryChange = (newCategory) => {
+    if (newCategory === category) return;
     setCategory(newCategory);
     setPage(1);
     setSearchQuery('');
+    setNews([]); // Clear existing news before loading new category
+  };
+
+  const handleDateFilterChange = (days) => {
+    setDateFilter(days);
+    setPage(1);
+    setNews([]);
   };
 
   const loadMore = () => {
@@ -74,11 +121,24 @@ export default function NewsPage() {
             <div className="h-1 w-24 mx-auto bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full"></div>
           </div>
           <div className="max-w-2xl mx-auto mt-8">
-            <SearchBar 
-              onSearch={handleSearch} 
-              placeholder="Search news..."
-              className="w-full bg-[#1A1F32]/50 text-gray-200 border border-gray-700/50 focus:border-indigo-500 rounded-xl"
-            />
+            <div className="flex gap-4 mb-4">
+              <SearchBar 
+                onSearch={handleSearch} 
+                placeholder="Search news..."
+                className="flex-1 bg-[#1A1F32]/50 text-gray-200 border border-gray-700/50 focus:border-indigo-500 rounded-xl"
+              />
+              <select
+                value={dateFilter}
+                onChange={(e) => handleDateFilterChange(Number(e.target.value))}
+                className="px-4 py-2 bg-[#1A1F32]/50 text-gray-200 border border-gray-700/50 rounded-xl focus:outline-none focus:border-indigo-500"
+              >
+                <option value={1}>Last 24 hours</option>
+                <option value={2}>Last 2 days</option>
+                <option value={3}>Last 3 days</option>
+                <option value={7}>Last week</option>
+                <option value={30}>Last month</option>
+              </select>
+            </div>
           </div>
         </div>
 

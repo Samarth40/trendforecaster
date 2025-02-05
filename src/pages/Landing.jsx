@@ -16,13 +16,12 @@ function Landing() {
   // Navigation items based on auth state
   const navItems = user ? [
     { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Projects', href: '/dashboard/projects' },
-    { label: 'Analytics', href: '/dashboard/analytics' },
-    { label: 'Team', href: '/dashboard/team' }
+    { label: 'News', href: '/dashboard/news' },
+    { label: 'Trends', href: '/dashboard/trends' },
+    { label: 'Chat', href: '/dashboard/chat' }
   ] : [
     { label: 'Features', href: '#features' },
-    { label: 'How It Works', href: '#how-it-works' },
-    { label: 'Pricing', href: '#pricing' }
+    { label: 'How It Works', href: '#how-it-works' }
   ];
 
   const handleNavigation = (href) => {
@@ -93,18 +92,18 @@ function Landing() {
                 className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:opacity-90 px-8 py-6 text-lg relative overflow-hidden group"
                 onClick={() => navigate('/register')}
               >
-                <span className="relative z-10">Start Free Trial</span>
+                <span className="relative z-10">Start Analyzing Trends</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </Button>
               <Button 
                 variant="outline"
                 className="px-8 py-6 text-lg border-2 relative overflow-hidden group hover:text-white transition-colors duration-300"
                 onClick={() => {
-                  const element = document.querySelector('#demo');
+                  const element = document.querySelector('#features');
                   element?.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
-                <span className="relative z-10">Watch Demo</span>
+                <span className="relative z-10">Explore Features</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 -translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
               </Button>
             </motion.div>
@@ -192,74 +191,87 @@ function Landing() {
         </div>
       </section>
 
-      {/* Statistics Section */}
-      <section className="w-full py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-purple-500/5 to-cyan-500/5" />
-        <div className="max-w-7xl mx-auto px-4 relative">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { number: "98%", label: "Prediction Accuracy", subtext: "Average trend prediction accuracy rate" },
-              { number: "2.5M", label: "Data Points", subtext: "Analyzed daily across platforms" },
-              { number: "500+", label: "Trends Identified", subtext: "Monthly emerging trend discoveries" },
-              { number: "15+", label: "Industries", subtext: "Specialized trend analysis" }
-            ].map((stat, index) => (
-              <motion.div
-                key={index}
-                className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent mb-2">
-                  {stat.number}
-                </div>
-                <div className="text-xl font-semibold text-white mb-2">{stat.label}</div>
-                <div className="text-gray-400 text-sm">{stat.subtext}</div>
-              </motion.div>
-            ))}
+      {/* Powerful Features Section */}
+      <section id="features" className="w-full py-24 relative">
+        <div className="max-w-7xl mx-auto px-4">
+          {/* Section Header */}
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
+                Powerful Features
+              </span>
+            </h2>
+            <div className="h-1 w-24 mx-auto bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full"></div>
           </div>
-        </div>
-      </section>
 
-      {/* Powerful Features - Moved here */}
-      <section id="features" className="w-full py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-cyan-500/5" />
-        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
-        
-        <div className="max-w-7xl mx-auto px-4 relative">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-16">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-cyan-400 to-purple-400 animate-gradient-x">
-              Powerful Features
-            </span>
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Features Grid with Creative Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
               <motion.div
                 key={index}
-                className="group relative"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="group"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500" />
-                <Card className="relative h-full bg-black/50 backdrop-blur-xl transform transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl">
-                  <CardHeader>
-                    <div className="w-16 h-16 rounded-xl bg-gradient-to-r from-purple-500/20 to-cyan-500/20 p-3 mb-4 group-hover:scale-110 transition-all duration-500">
-                  {feature.icon}
+                <div className="relative bg-[#1A1F32] rounded-xl p-6 h-full transform transition-transform duration-300 hover:-translate-y-2">
+                  {/* Feature Icon */}
+                  <div className="flex items-center mb-6">
+                    <div className="w-12 h-12 bg-[#0F1629] rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
+                      {feature.icon}
+                    </div>
+                    <div className="h-px flex-grow bg-gradient-to-r from-indigo-500 to-transparent"></div>
+                  </div>
+
+                  {/* Feature Content */}
+                  <h3 className="text-xl font-semibold text-white mb-3 group-hover:text-indigo-400 transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-400">
+                    {feature.description}
+                  </p>
+
+                  {/* Interactive Element */}
+                  <div 
+                    onClick={() => navigate(feature.link)}
+                    className="mt-6 flex items-center text-sm text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer hover:text-indigo-300"
+                  >
+                    <span className="mr-2">Learn more</span>
+                    <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </div>
+
+                  {/* Decorative Corner */}
+                  <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden">
+                    <div className="absolute top-0 right-0 w-4 h-4 bg-indigo-500 rounded-bl-xl transform rotate-45 translate-x-1/2 -translate-y-1/2"></div>
+                  </div>
                 </div>
-                    <CardTitle className="text-2xl bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
-                      {feature.title}
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">
-                      {feature.description}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
               </motion.div>
             ))}
           </div>
+
+          {/* Interactive Feature Showcase */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-16 bg-[#1A1F32] rounded-2xl p-8"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { label: "Real-time Analysis", icon: "⚡" },
+                { label: "Smart Predictions", icon: "🎯" },
+                { label: "Data Visualization", icon: "📊" }
+              ].map((item, index) => (
+                <div key={index} className="flex items-center space-x-4 p-4 rounded-xl bg-[#0F1629] hover:bg-indigo-500/10 transition-colors">
+                  <span className="text-2xl">{item.icon}</span>
+                  <span className="text-gray-200">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -271,17 +283,18 @@ function Landing() {
         <div className="max-w-7xl mx-auto px-4 relative">
           <div className="text-center mb-16">
             <motion.h2 
-              className="text-5xl font-bold mb-6"
+              className="text-4xl md:text-5xl font-bold mb-6"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
             >
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-cyan-400 to-purple-400 animate-gradient-x">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                 World-Class Security
               </span>
             </motion.h2>
+            <div className="h-1 w-24 mx-auto bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full"></div>
             <motion.p 
-              className="text-xl text-gray-300 max-w-2xl mx-auto"
+              className="text-xl text-gray-300 max-w-2xl mx-auto mt-6"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -578,12 +591,13 @@ function Landing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
             >
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-cyan-400 to-purple-400 animate-gradient-x">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                 Your Journey to Trend Mastery
               </span>
             </motion.h2>
+            <div className="h-1 w-24 mx-auto bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full"></div>
             <motion.p 
-              className="text-xl text-gray-300 max-w-3xl mx-auto"
+              className="text-xl text-gray-300 max-w-3xl mx-auto mt-6"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -602,163 +616,65 @@ function Landing() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500" />
-                <Card className="relative h-full bg-black/50 backdrop-blur-xl border border-white/10 group-hover:border-white/20 transition-all duration-300">
-                  <CardHeader className="p-6">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500/20 to-cyan-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-all duration-300">
-                        <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
-                          {index + 1}
-                        </span>
+                <div className="bg-[#1A1F32] border-l-4 border-indigo-500 rounded-r-xl p-8 h-full transition-all duration-300 hover:translate-x-2">
+                  {/* Step Number and Title */}
+                  <div className="flex items-center mb-6">
+                    <span className="text-5xl font-bold text-indigo-500/50 mr-4 font-display">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <h3 className="text-xl font-semibold text-white">
+                      {step.title}
+                    </h3>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-gray-400 mb-6 pl-2 border-l border-gray-700">
+                    {step.description}
+                  </p>
+
+                  {/* Features List */}
+                  <div className="space-y-3 pl-2">
+                    {step.features.map((feature, featureIndex) => (
+                      <div 
+                        key={featureIndex} 
+                        className="flex items-center text-gray-300 hover:text-indigo-400 transition-colors group/item"
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/50 group-hover/item:bg-indigo-500 mr-3 transition-colors"></div>
+                        {feature}
                       </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-xl mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
-                          {step.title}
-                        </CardTitle>
-                        <CardDescription className="text-gray-300">
-                          {step.description}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <div className="space-y-3 pt-4 border-t border-white/10">
-                      {step.features.map((feature, featureIndex) => (
-                        <div key={featureIndex} className="flex items-center gap-3 group/item">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 flex items-center justify-center group-hover/item:scale-110 transition-all duration-300">
-                            <svg 
-                              className="w-4 h-4 text-cyan-400" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth="2" 
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          </div>
-                          <span className="text-gray-400 group-hover/item:text-gray-300 transition-colors duration-300">
-                            {feature}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardHeader>
-                </Card>
+                    ))}
+                  </div>
+
+                  {/* Progress Line */}
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500/20 to-transparent"></div>
+                </div>
               </motion.div>
             ))}
           </div>
 
+          {/* Bottom CTA - Updated Style */}
           <motion.div
             className="mt-16 text-center"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <div className="inline-flex items-center gap-8 p-4 rounded-2xl bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-white/10">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
+            <div className="inline-flex items-center gap-6 p-6 bg-[#1A1F32] rounded-xl border-t border-indigo-500/20">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-1 bg-indigo-500/50 rounded-full"></div>
                 <div className="text-left">
-                  <div className="text-sm font-medium text-gray-300">Ready to start?</div>
-                  <div className="text-xs text-gray-400">Setup takes less than 5 minutes</div>
+                  <div className="text-lg font-medium text-white">Ready to start?</div>
+                  <div className="text-sm text-gray-400">Setup takes less than 5 minutes</div>
                 </div>
               </div>
               <Button 
-                className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:opacity-90 px-6 py-2.5 text-sm relative group overflow-hidden"
+                className="bg-indigo-500 hover:bg-indigo-600 px-8 py-3 text-white rounded-lg transition-colors"
                 onClick={() => navigate('/register')}
               >
-                <span className="relative z-10">Get Started Now</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                Get Started Now
               </Button>
             </div>
           </motion.div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="min-h-screen w-full flex items-center justify-center relative py-24">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-cyan-500/5" />
-        <div className="max-w-7xl mx-auto px-4 relative">
-          <h2 className="text-5xl font-bold text-center mb-4">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-cyan-400 to-purple-400 animate-gradient-x">
-              Simple, Transparent Pricing
-              </span>
-            </h2>
-          <p className="text-center text-xl text-gray-300 mb-16">14-day free trial · No credit card required</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {pricingPlans.map((plan, index) => (
-              <motion.div
-                key={index}
-                className={`relative group ${plan.popular ? 'md:-mt-8' : ''}`}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500" />
-                <Card className="relative h-full bg-black/50 backdrop-blur-xl transform transition-all duration-500 hover:scale-[1.02]">
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                      <span className="px-4 py-1 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 text-white text-sm">
-                        Most Popular
-                      </span>
-                    </div>
-                  )}
-                  <CardHeader>
-                    <CardTitle className="text-2xl bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">
-                      {plan.name}
-                    </CardTitle>
-                    <div className="mt-4 flex items-baseline">
-                      <span className="text-5xl font-bold">${plan.price}</span>
-                      <span className="ml-2 text-gray-400">/month</span>
-                </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-4">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center text-gray-300">
-                          <svg className="w-5 h-5 mr-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                    <Button 
-                      className="w-full mt-8 bg-gradient-to-r from-purple-500 to-cyan-500 hover:opacity-90"
-                  onClick={() => navigate('/register')}
-                    >
-                      Start Free Trial
-                    </Button>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="w-full py-24 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-purple-500/5 to-cyan-500/5" />
-        <div className="max-w-3xl mx-auto px-4 text-center relative">
-          <h2 className="text-5xl font-bold mb-8">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-cyan-400 to-purple-400 animate-gradient-x">
-              Ready to Transform Your Workflow?
-            </span>
-          </h2>
-          <p className="text-xl text-gray-300 mb-12">Join 10,000+ teams already thriving with our platform</p>
-          <Button 
-            className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:opacity-90 px-8 py-6 text-lg"
-            onClick={() => navigate('/register')}
-          >
-            Start Your Free Trial →
-          </Button>
         </div>
       </section>
 
@@ -770,130 +686,64 @@ function Landing() {
 // Features data
 const features = [
   {
-    title: "AI Trend Detection",
-    description: "Advanced algorithms analyze millions of data points to identify emerging trends before they go mainstream.",
+    title: "AI-Powered News Analysis",
+    description: "Stay informed with our comprehensive news aggregation and analysis across multiple categories and sources.",
+    icon: (
+      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1M19 20a2 2 0 002-2V8m-2 12a2 2 0 01-2-2v-1" />
+      </svg>
+    ),
+    link: "/dashboard/news"
+  },
+  {
+    title: "Trend Detection",
+    description: "Advanced algorithms analyze market data to identify emerging trends and provide actionable insights.",
     icon: (
       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
       </svg>
     ),
+    link: "/dashboard/trends"
   },
   {
-    title: "Real-time Analytics",
-    description: "Monitor trend movements across social media, news, and market data with instant insights and alerts.",
+    title: "AI Chat Assistant",
+    description: "Get instant insights and analysis with our AI-powered chatbot, trained to help with trend analysis and content ideas.",
     icon: (
       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
       </svg>
     ),
-  },
-  {
-    title: "Predictive Insights",
-    description: "Get detailed predictions about trend longevity, potential impact, and target audience demographics.",
-    icon: (
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
+    link: "/dashboard/chat"
+  }
 ];
 
 // Steps data
 const steps = [
   {
-    title: "Connect Your Data Sources",
-    description: "Begin by integrating your existing data streams and platforms with our AI-powered system.",
+    title: "Browse Latest News",
+    description: "Access curated news from multiple sources across different categories.",
     features: [
-      "One-click integration with major platforms",
-      "Secure API connections",
-      "Custom data source support"
+      "Real-time news updates",
+      "Category-based filtering",
+      "Detailed article views"
     ]
   },
   {
-    title: "Configure Your Trend Parameters",
-    description: "Customize your trend detection settings to match your industry and specific needs.",
+    title: "Analyze Trends",
+    description: "Identify and track emerging trends in your industry.",
     features: [
-      "Industry-specific templates",
-      "Custom sensitivity settings",
-      "Advanced filtering options"
-    ]
-  },
-  {
-    title: "Train Your AI Model",
-    description: "Let our system learn from your historical data to improve prediction accuracy.",
-    features: [
-      "Automated learning process",
+      "Trend visualization",
       "Historical data analysis",
-      "Pattern recognition setup"
+      "Market insights"
     ]
   },
   {
-    title: "Monitor Real-time Insights",
-    description: "Watch as our AI identifies and analyzes emerging trends in real-time.",
+    title: "Get AI Assistance",
+    description: "Leverage our AI chatbot for deeper insights and analysis.",
     features: [
-      "Live trend dashboard",
-      "Instant notifications",
-      "Trend strength indicators"
-    ]
-  },
-  {
-    title: "Generate Actionable Reports",
-    description: "Transform trend data into strategic insights and action plans.",
-    features: [
-      "Customizable report templates",
-      "Export in multiple formats",
-      "Automated scheduling"
-    ]
-  },
-  {
-    title: "Optimize & Scale",
-    description: "Continuously improve your trend forecasting with AI-driven optimization.",
-    features: [
-      "Performance analytics",
-      "Strategy recommendations",
-      "Scaling assistance"
-    ]
-  }
-];
-
-// Pricing plans data
-const pricingPlans = [
-  {
-    name: "Starter",
-    price: 49,
-    features: [
-      "Basic trend detection",
-      "3 industry categories",
-      "Weekly trend reports",
-      "Basic social media monitoring",
-      "Email alerts"
-    ]
-  },
-  {
-    name: "Pro",
-    price: 149,
-    popular: true,
-    features: [
-      "Advanced trend prediction",
-      "All industry categories",
-      "Real-time trend alerts",
-      "Competitor trend analysis",
-      "Custom trend parameters",
-      "API access",
-      "Priority support"
-    ]
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    features: [
-      "Custom AI models",
-      "Dedicated trend analyst",
-      "Custom data integration",
-      "White-label reports",
-      "Advanced API access",
-      "24/7 priority support",
-      "Training sessions"
+      "Instant responses",
+      "Trend predictions",
+      "Content suggestions"
     ]
   }
 ];

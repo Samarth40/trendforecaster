@@ -11,6 +11,8 @@ export default function NewsDetail() {
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fullContent, setFullContent] = useState(null);
+  const [loadingContent, setLoadingContent] = useState(false);
 
   useEffect(() => {
     const fetchArticle = async () => {
@@ -25,6 +27,7 @@ export default function NewsDetail() {
         }
         
         setArticle(foundArticle);
+        fetchFullContent(foundArticle.url);
       } catch (err) {
         setError('Failed to load article');
         console.error('Error loading article:', err);
@@ -35,6 +38,20 @@ export default function NewsDetail() {
 
     fetchArticle();
   }, [id]);
+
+  const fetchFullContent = async (url) => {
+    try {
+      setLoadingContent(true);
+      const content = await newsService.getFullArticle(url);
+      if (content) {
+        setFullContent(content);
+      }
+    } catch (error) {
+      console.error('Error fetching full content:', error);
+    } finally {
+      setLoadingContent(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -102,6 +119,12 @@ export default function NewsDetail() {
               <span className="text-gray-400 text-sm">
                 {formatDistanceToNow(article.publishedAt, { addSuffix: true })}
               </span>
+              <span className="text-gray-400 text-sm flex items-center">
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {article.readTime} min read
+              </span>
             </div>
 
             <h1 className="text-4xl font-bold text-white mb-6">
@@ -129,9 +152,26 @@ export default function NewsDetail() {
               <p className="text-gray-300 text-lg leading-relaxed mb-8">
                 {article.description}
               </p>
-              <p className="text-gray-300 text-lg leading-relaxed mb-8">
-                {article.content}
-              </p>
+              
+              {loadingContent ? (
+                <div className="flex justify-center my-8">
+                  <LoadingSpinner size="medium" />
+                </div>
+              ) : fullContent ? (
+                <div className="text-gray-300 text-lg leading-relaxed space-y-6">
+                  {fullContent.split('\n').map((paragraph, index) => (
+                    paragraph.trim() && (
+                      <p key={index} className="text-gray-300">
+                        {paragraph}
+                      </p>
+                    )
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-300 text-lg leading-relaxed mb-8">
+                  {article.content}
+                </p>
+              )}
             </div>
 
             <div className="mt-8 pt-8 border-t border-gray-800">
@@ -141,7 +181,7 @@ export default function NewsDetail() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-6 py-3 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
               >
-                Read Full Article
+                Read Original Article
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>

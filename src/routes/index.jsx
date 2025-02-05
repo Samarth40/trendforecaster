@@ -12,6 +12,9 @@ import AIContentChat from '../pages/AIContentChat';
 import SavedIdeas from '../pages/SavedIdeas';
 import NewsPage from '../components/news/NewsPage';
 import NewsDetail from '../components/news/NewsDetail';
+import Privacy from '../pages/Privacy';
+import Terms from '../pages/Terms';
+import Contact from '../pages/Contact';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -54,6 +57,13 @@ function AppRoutes() {
     <Routes>
       {/* Public Route - Landing Page */}
       <Route path="/" element={<Landing />} />
+
+      {/* Public Routes with MainLayout */}
+      <Route element={<MainLayout />}>
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/contact" element={<Contact />} />
+      </Route>
 
       {/* Auth Routes - Only accessible when not logged in */}
       <Route
