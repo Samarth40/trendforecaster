@@ -6,6 +6,7 @@ import { Github, Twitter, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
 export default function Footer() {
   const footerLinks = {
     legal: [
+      { name: 'About Us', href: 'https://samarth-shinde.vercel.app/', external: true },
       { name: 'Privacy Policy', href: '/privacy' },
       { name: 'Terms of Service', href: '/terms' },
       { name: 'Contact Us', href: '/contact' }
@@ -61,13 +62,25 @@ export default function Footer() {
               <ul className="space-y-3">
                 {footerLinks.legal.map((link) => (
                   <li key={link.name}>
-                    <Link
-                      to={link.href}
-                      className="text-gray-400 hover:text-white transition-colors inline-flex items-center group"
-                    >
-                      <span className="w-0 group-hover:w-2 h-px bg-blue-500 mr-0 group-hover:mr-2 transition-all duration-300" />
-                      {link.name}
-                    </Link>
+                    {link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-white transition-colors inline-flex items-center group"
+                      >
+                        <span className="w-0 group-hover:w-2 h-px bg-blue-500 mr-0 group-hover:mr-2 transition-all duration-300" />
+                        {link.name}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.href}
+                        className="text-gray-400 hover:text-white transition-colors inline-flex items-center group"
+                      >
+                        <span className="w-0 group-hover:w-2 h-px bg-blue-500 mr-0 group-hover:mr-2 transition-all duration-300" />
+                        {link.name}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

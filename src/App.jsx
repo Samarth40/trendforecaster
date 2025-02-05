@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { LoadingProvider } from './contexts/LoadingContext';
 import AppRoutes from './routes';
 import './index.css';
 import './config/firebase'; // Import to ensure Firebase is initialized
@@ -23,9 +24,11 @@ function App() {
         theme="dark"
       />
       <Router>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
+        <LoadingProvider>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </LoadingProvider>
       </Router>
     </>
   );

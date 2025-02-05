@@ -1,5 +1,7 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLoading } from '../contexts/LoadingContext';
 import MainLayout from '../components/layout/MainLayout';
 import Login from '../components/auth/Login';
 import Register from '../components/auth/Register';
@@ -54,6 +56,23 @@ function RequireNoAuth({ children }) {
 }
 
 function AppRoutes() {
+  const location = useLocation();
+  const { startLoading, stopLoading } = useLoading();
+
+  // Handle route changes
+  useEffect(() => {
+    // Start loading
+    startLoading();
+
+    // Stop loading after a delay
+    const timer = setTimeout(() => {
+      stopLoading();
+    }, 1000); // Show loader for 1 second during navigation
+
+    // Cleanup
+    return () => clearTimeout(timer);
+  }, [location.pathname]); // Trigger on actual route changes
+
   return (
     <Routes>
       {/* Public Route - Landing Page */}
