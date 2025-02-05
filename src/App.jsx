@@ -7,6 +7,7 @@ import './index.css';
 import './config/firebase'; // Import to ensure Firebase is initialized
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         theme="dark"
       />
       <Router>
+        <ScrollToTop />
         <LoadingProvider>
           <AuthProvider>
             <AppRoutes />

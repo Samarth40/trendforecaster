@@ -28,8 +28,8 @@ const Navbar = () => {
     { label: 'AI Chat', href: '/dashboard/chat' }
   ] : [
     { label: 'Features', href: '#features' },
-    { label: 'Testimonials', href: '#testimonials' },
-    { label: 'Pricing', href: '#pricing' }
+    { label: 'How It Works', href: '#how-it-works' },
+    { label: 'FAQ', href: '#faq' }
   ];
 
   const handleNavigation = (href) => {

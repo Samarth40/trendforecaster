@@ -443,7 +443,7 @@ function Landing() {
       </section>
 
       {/* FAQ Section - Enhanced Modern Design */}
-      <section className="w-full py-24 relative overflow-hidden">
+      <section id="faq" className="w-full py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-cyan-500/5" />
         <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
         
