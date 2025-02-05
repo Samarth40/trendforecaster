@@ -1,7 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { Link } from 'react-router-dom';
 
 export default function NewsCard({ article }) {
   const {
@@ -12,7 +11,6 @@ export default function NewsCard({ article }) {
     source,
     publishedAt,
     category,
-    url
   } = article;
 
   const getCategoryColor = (category) => {
@@ -23,35 +21,52 @@ export default function NewsCard({ article }) {
       health: 'bg-red-500/10 text-red-300 border-red-500/20',
       entertainment: 'bg-pink-500/10 text-pink-300 border-pink-500/20',
       sports: 'bg-orange-500/10 text-orange-300 border-orange-500/20',
-      general: 'bg-gray-500/10 text-gray-300 border-gray-500/20'
+      world: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20',
+      politics: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20',
+      top: 'bg-blue-500/10 text-blue-300 border-blue-500/20'
     };
-    return colors[category] || colors.general;
+    return colors[category] || colors.top;
   };
 
   const formatPublishedDate = (date) => {
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffMinutes = Math.floor(diffTime / (1000 * 60));
-    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    try {
+      // Ensure we have a valid Date object
+      const publishedDate = date instanceof Date ? date : new Date(date);
+      
+      if (isNaN(publishedDate.getTime())) {
+        return 'Date unavailable';
+      }
 
-    if (diffMinutes < 60) {
-      return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-    } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-    } else {
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
+      const now = new Date();
+      const diffTime = Math.abs(now - publishedDate);
+      const diffMinutes = Math.floor(diffTime / (1000 * 60));
+      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffMinutes < 60) {
+        return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+      } else if (diffDays < 7) {
+        return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+      } else {
+        return publishedDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Date unavailable';
     }
   };
 
   return (
-    <Link to={`/dashboard/news/${id}`} className="block group">
+    <Link 
+      to={`/dashboard/news/article/${encodeURIComponent(id)}`} 
+      className="block group"
+    >
       <motion.article 
         className="bg-[#1A1F32]/50 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden h-full border border-gray-700/50 hover:border-indigo-500/50"
         whileHover={{ y: -5, scale: 1.02 }}
@@ -63,6 +78,10 @@ export default function NewsCard({ article }) {
               src={imageUrl}
               alt={title}
               className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/400x200?text=No+Image';
+              }}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#1A1F32] to-[#0F1629] flex items-center justify-center">

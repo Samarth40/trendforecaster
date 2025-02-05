@@ -1093,19 +1093,36 @@ class DashboardService {
   calculateStreak(activityHistory = []) {
     if (!activityHistory.length) return 0;
     
+    // Get unique dates and sort them in descending order
     const dates = activityHistory
       .map(activity => new Date(activity.timestamp).toDateString())
       .filter((date, index, self) => self.indexOf(date) === index)
       .sort((a, b) => new Date(b) - new Date(a));
 
-    let streak = 1;
-    for (let i = 1; i < dates.length; i++) {
-      const curr = new Date(dates[i]);
-      const prev = new Date(dates[i - 1]);
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString();
+    
+    // If no activity today or yesterday, streak is broken
+    if (!dates.includes(today) && !dates.includes(yesterday)) {
+      return 0;
+    }
+
+    let streak = dates.includes(today) ? 1 : 0;
+    let currentDate = dates.includes(today) ? today : yesterday;
+
+    for (const date of dates) {
+      if (date === currentDate) continue;
+
+      const curr = new Date(date);
+      const prev = new Date(currentDate);
       const diffDays = Math.floor((prev - curr) / (1000 * 60 * 60 * 24));
       
-      if (diffDays === 1) streak++;
-      else break;
+      if (diffDays === 1) {
+        streak++;
+        currentDate = date;
+      } else {
+        break;
+      }
     }
     
     return streak;

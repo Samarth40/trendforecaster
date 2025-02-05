@@ -12,6 +12,7 @@ import AIContentChat from '../pages/AIContentChat';
 import SavedIdeas from '../pages/SavedIdeas';
 import NewsPage from '../components/news/NewsPage';
 import NewsDetail from '../components/news/NewsDetail';
+import ArticleView from '../components/news/ArticleView';
 import Privacy from '../pages/Privacy';
 import Terms from '../pages/Terms';
 import Contact from '../pages/Contact';
@@ -96,7 +97,7 @@ function AppRoutes() {
         <Route path="trends" element={<TrendAnalysis />} />
         <Route path="trend/:trendName" element={<TrendDetailPage />} />
         <Route path="news" element={<NewsPage />} />
-        <Route path="news/:id" element={<NewsDetail />} />
+        <Route path="news/article/:id" element={<ArticleView />} />
         <Route path="chat" element={<AIContentChat />} />
         <Route path="settings" element={<Settings />} />
         <Route path="saved-ideas" element={<SavedIdeas />} />

@@ -1,155 +1,195 @@
 import axios from 'axios';
 
-const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY;
-const BASE_URL = 'https://newsapi.org/v2';
+const GUARDIAN_API_KEY = import.meta.env.VITE_GUARDIAN_API_KEY || '7b171588-f6e2-4953-9eae-7e9e47a6e821';
+const BASE_URL = 'https://content.guardianapis.com';
+
+// Valid sections for The Guardian API
+const VALID_CATEGORIES = {
+  world: 'world',
+  technology: 'technology',
+  sport: 'sport',
+  business: 'business',
+  politics: 'politics',
+  culture: 'culture',
+  lifeandstyle: 'lifeandstyle',  // Guardian uses 'lifeandstyle' for lifestyle section
+  science: 'science',
+  environment: 'environment',
+  media: 'media'
+};
 
 class NewsService {
   constructor() {
     this.api = axios.create({
-      baseURL: BASE_URL,
-      headers: {
-        'X-Api-Key': NEWS_API_KEY
-      }
+      baseURL: BASE_URL
     });
 
     // Initialize cache
     this.cache = new Map();
-    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes cache for fresh news
+    this.loadCacheFromStorage();
   }
 
-  async getTopNews(category = 'general', page = 1, pageSize = 20, days = 1) {
-    const cacheKey = `top-${category}-${page}-${pageSize}-${days}`;
-    const cached = this.getFromCache(cacheKey);
-    if (cached) return cached;
-
+  loadCacheFromStorage() {
     try {
-      let response;
-      const toDate = new Date();
-      const fromDate = new Date();
-      fromDate.setDate(fromDate.getDate() - days);
-      
-      // Format dates in YYYY-MM-DD format
-      const from = fromDate.toISOString().split('T')[0];
-      const to = toDate.toISOString().split('T')[0];
-
-      if (category === 'general') {
-        response = await this.api.get('/everything', {
-          params: {
-            q: 'news',
-            language: 'en',
-            from,
-            to,
-            sortBy: 'publishedAt',
-            page,
-            pageSize,
-            domains: 'bbc.com,cnn.com,reuters.com,nytimes.com,theguardian.com,apnews.com'
-          }
-        });
-      } else {
-        response = await this.api.get('/everything', {
-          params: {
-            q: `${category} news`,
-            language: 'en',
-            from,
-            to,
-            sortBy: 'publishedAt',
-            page,
-            pageSize,
-            domains: 'bbc.com,cnn.com,reuters.com,nytimes.com,theguardian.com,apnews.com'
+      const savedCache = localStorage.getItem('guardian_cache');
+      if (savedCache) {
+        const parsed = JSON.parse(savedCache);
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (Date.now() - value.timestamp < this.cacheTimeout) {
+            this.cache.set(key, value);
           }
         });
       }
-
-      const processedData = this.processArticles(response.data.articles || []);
-      const filteredData = category === 'general' 
-        ? processedData.filter(article => !article.category || article.category === 'general')
-        : processedData.filter(article => article.category === category);
-      
-      this.setInCache(cacheKey, filteredData);
-      return filteredData;
     } catch (error) {
-      console.error('Error fetching top news:', error);
-      throw error;
+      console.error('Error loading cache:', error);
     }
   }
 
-  async searchNews(query, page = 1, pageSize = 20, days = 1) {
-    const cacheKey = `search-${query}-${page}-${pageSize}-${days}`;
+  saveToStorage() {
+    try {
+      const cacheObj = {};
+      this.cache.forEach((value, key) => {
+        cacheObj[key] = value;
+      });
+      localStorage.setItem('guardian_cache', JSON.stringify(cacheObj));
+    } catch (error) {
+      console.error('Error saving cache:', error);
+    }
+  }
+
+  validateCategory(category) {
+    return Object.keys(VALID_CATEGORIES).includes(category.toLowerCase());
+  }
+
+  async getTopNews(category = 'world', page = 1, pageSize = 10) {
+    const cacheKey = `top-${category}-${page}-${pageSize}`;
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
 
     try {
-      const toDate = new Date();
-      const fromDate = new Date();
-      fromDate.setDate(fromDate.getDate() - days);
-      
-      // Format dates in YYYY-MM-DD format
-      const from = fromDate.toISOString().split('T')[0];
-      const to = toDate.toISOString().split('T')[0];
+      console.log('Fetching news for category:', category);
+      const params = {
+        'api-key': GUARDIAN_API_KEY,
+        'page': page,
+        'page-size': pageSize,
+        'show-fields': 'all',
+        'order-by': 'newest',
+        'section': VALID_CATEGORIES[category.toLowerCase()]
+      };
 
-      const response = await this.api.get('/everything', {
-        params: {
-          q: query,
-          page,
-          pageSize,
-          language: 'en',
-          from,
-          to,
-          sortBy: 'publishedAt',
-          domains: 'bbc.com,cnn.com,reuters.com,nytimes.com,theguardian.com,apnews.com'
-        }
-      });
+      // For world news, we want to include international news
+      if (category === 'world') {
+        params.section = 'world|international';
+        params['tag'] = 'world/world';
+      }
 
-      const processedData = this.processArticles(response.data.articles || []);
+      const response = await this.api.get('/search', { params });
+
+      if (!response.data?.response?.results) {
+        console.error('Invalid API response:', response.data);
+        throw new Error('Invalid API response');
+      }
+
+      const processedData = this.processArticles(response.data.response.results, category);
       this.setInCache(cacheKey, processedData);
       return processedData;
     } catch (error) {
-      console.error('Error searching news:', error);
+      console.error('Error in getTopNews:', error.response?.data || error.message);
       throw error;
     }
   }
 
-  async getFullArticle(url) {
+  async searchNews(query, page = 1, pageSize = 10) {
+    if (!query || query.trim().length === 0) {
+      throw new Error('Invalid API parameters: search query is required');
+    }
+
+    const cacheKey = `search-${query}-${page}-${pageSize}`;
+    const cached = this.getFromCache(cacheKey);
+    if (cached) return cached;
+
     try {
-      const response = await axios.get(url);
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(response.data, 'text/html');
-      
-      // Try to find the main article content
-      const article = doc.querySelector('article') || 
-                     doc.querySelector('.article-content') || 
-                     doc.querySelector('.story-content') ||
-                     doc.querySelector('main');
-      
-      if (article) {
-        return article.textContent.trim();
+      console.log('Searching news for query:', query);
+      const params = {
+        'api-key': GUARDIAN_API_KEY,
+        'q': query.trim(),
+        'page': page,
+        'page-size': pageSize,
+        'show-fields': 'all',
+        'order-by': 'relevance'
+      };
+
+      const response = await this.api.get('/search', { params });
+
+      if (!response.data?.response?.results) {
+        console.error('Invalid API response:', response.data);
+        throw new Error('Invalid API response');
       }
-      
-      return null;
+
+      const processedData = this.processArticles(response.data.response.results);
+      this.setInCache(cacheKey, processedData);
+      return processedData;
     } catch (error) {
-      console.error('Error fetching full article:', error);
-      return null;
+      console.error('Error in searchNews:', error.response?.data || error.message);
+      throw error;
     }
   }
 
-  processArticles(articles) {
-    return articles.map(article => ({
-      id: this.generateId(article.url),
-      title: article.title,
-      description: article.description,
-      content: article.content,
-      fullContent: null,
-      url: article.url,
-      imageUrl: article.urlToImage,
-      source: article.source.name,
-      author: article.author,
-      publishedAt: new Date(article.publishedAt),
-      category: this.categorizeArticle(article.title + ' ' + (article.description || '')),
-      readTime: this.calculateReadTime(article.content || article.description || ''),
-      daysAgo: this.calculateDaysAgo(new Date(article.publishedAt))
-    }));
+  processArticles(articles, requestedCategory) {
+    if (!Array.isArray(articles)) {
+      console.error('Invalid articles data:', articles);
+      return [];
+    }
+
+    return articles.map(article => {
+      try {
+        const fields = article.fields || {};
+        // Use the requested category instead of the article's section
+        const category = requestedCategory || article.sectionName?.toLowerCase() || 'world';
+        
+        return {
+          id: article.id,
+          title: article.webTitle,
+          description: fields.trailText || fields.standfirst || '',
+          content: fields.bodyText || '',
+          fullContent: fields.body || null,
+          url: article.webUrl,
+          imageUrl: fields.thumbnail || fields.main || null,
+          source: 'The Guardian',
+          author: fields.byline || 'The Guardian',
+          publishedAt: new Date(article.webPublicationDate),
+          category: category,
+          readTime: this.calculateReadTime(fields.bodyText || fields.trailText || ''),
+          daysAgo: this.calculateDaysAgo(new Date(article.webPublicationDate))
+        };
+      } catch (error) {
+        console.error('Error processing article:', error, article);
+        return null;
+      }
+    }).filter(article => article !== null);
   }
 
+  getFromCache(key) {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      console.log('Returning cached data for:', key);
+      return cached.data;
+    }
+    this.cache.delete(key);
+    this.saveToStorage();
+    return null;
+  }
+
+  setInCache(key, data) {
+    const cacheData = {
+      data,
+      timestamp: Date.now()
+    };
+    this.cache.set(key, cacheData);
+    this.saveToStorage();
+  }
+
+  // Helper methods remain the same
   calculateReadTime(text) {
     const wordsPerMinute = 200;
     const words = text.trim().split(/\s+/).length;
@@ -165,74 +205,59 @@ class NewsService {
   }
 
   generateId(url) {
-    return btoa(url).replace(/[^a-zA-Z0-9]/g, '');
+    return btoa(url || Date.now().toString()).replace(/[^a-zA-Z0-9]/g, '');
   }
 
-  categorizeArticle(text) {
-    const categoryPatterns = {
-      technology: [
-        'tech', 'software', 'ai', 'digital', 'cyber', 'robot', 'programming',
-        'computer', 'internet', 'app', 'smartphone', 'gadget', 'innovation'
-      ],
-      business: [
-        'business', 'economy', 'market', 'stock', 'trade', 'finance',
-        'investment', 'startup', 'company', 'industry', 'corporate', 'revenue'
-      ],
-      science: [
-        'science', 'research', 'study', 'discovery', 'space', 'physics',
-        'chemistry', 'biology', 'experiment', 'laboratory', 'scientist'
-      ],
-      health: [
-        'health', 'medical', 'covid', 'disease', 'treatment', 'hospital',
-        'doctor', 'patient', 'medicine', 'vaccine', 'wellness', 'healthcare'
-      ],
-      entertainment: [
-        'movie', 'film', 'music', 'celebrity', 'entertainment', 'hollywood',
-        'actor', 'actress', 'singer', 'concert', 'tv', 'show', 'series'
-      ],
-      sports: [
-        'sport', 'football', 'basketball', 'soccer', 'game', 'player',
-        'team', 'match', 'tournament', 'championship', 'athlete', 'racing'
-      ]
-    };
+  async getArticleById(id) {
+    const cacheKey = `article-${id}`;
+    const cached = this.getFromCache(cacheKey);
+    if (cached) return cached;
 
-    text = text.toLowerCase();
-    
-    // Check each category's patterns
-    for (const [category, patterns] of Object.entries(categoryPatterns)) {
-      if (patterns.some(pattern => text.includes(pattern))) {
-        return category;
+    try {
+      console.log('Fetching article by ID:', id);
+      const params = {
+        'api-key': GUARDIAN_API_KEY,
+        'show-fields': 'all',
+        'show-tags': 'all',
+        'show-elements': 'all'
+      };
+
+      // The Guardian API expects the ID in the format: world/2024/mar/20/example-article
+      // Remove the leading forward slash if present
+      const cleanId = id.startsWith('/') ? id.slice(1) : id;
+      
+      const response = await this.api.get(`/${cleanId}`, { params });
+
+      if (!response.data?.response?.content) {
+        console.error('Invalid API response:', response.data);
+        throw new Error('Invalid API response');
       }
+
+      const article = response.data.response.content;
+      const fields = article.fields || {};
+      
+      const processedArticle = {
+        id: article.id,
+        title: article.webTitle,
+        description: fields.trailText || fields.standfirst || '',
+        content: fields.bodyText || '',
+        fullContent: fields.body || null,
+        url: article.webUrl,
+        imageUrl: fields.thumbnail || fields.main || null,
+        source: 'The Guardian',
+        author: fields.byline || 'The Guardian',
+        publishedAt: new Date(article.webPublicationDate),
+        category: article.sectionName?.toLowerCase() || 'world',
+        readTime: this.calculateReadTime(fields.bodyText || fields.trailText || ''),
+        daysAgo: this.calculateDaysAgo(new Date(article.webPublicationDate))
+      };
+
+      this.setInCache(cacheKey, processedArticle);
+      return processedArticle;
+    } catch (error) {
+      console.error('Error in getArticleById:', error.response?.data || error.message);
+      throw error;
     }
-
-    // If no specific category is found, check if it's a general news article
-    const generalPatterns = [
-      'news', 'update', 'report', 'world', 'country', 'government',
-      'policy', 'society', 'community', 'people', 'public'
-    ];
-
-    if (generalPatterns.some(pattern => text.includes(pattern))) {
-      return 'general';
-    }
-
-    // Default to general if no specific category is identified
-    return 'general';
-  }
-
-  getFromCache(key) {
-    const cached = this.cache.get(key);
-    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      return cached.data;
-    }
-    this.cache.delete(key);
-    return null;
-  }
-
-  setInCache(key, data) {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
   }
 }
 
