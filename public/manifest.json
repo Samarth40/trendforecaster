@@ -1,6 +1,6 @@
 {
   "short_name": "TrendForecaster",
-  "name": "TrendForecaster - AI-powered trend analysis",
+  "name": "TrendForecaster - AI-Powered Trend Analysis",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#0F1629",
+  "theme_color": "#000000",
   "background_color": "#0F1629"
 } 

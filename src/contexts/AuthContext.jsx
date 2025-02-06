@@ -223,6 +223,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     userData,
+    setUserData,
     loading: loading || userLoading,
     authChecked,
     authError,

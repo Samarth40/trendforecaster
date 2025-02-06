@@ -96,8 +96,24 @@ const Navbar = () => {
             ) : user ? (
               <div className="flex items-center space-x-4">
                 {userData && (
-                  <div className="text-gray-300 font-sans">
-                    {userData.firstName}
+                  <div 
+                    className="text-gray-300 font-sans cursor-pointer hover:text-white transition-colors"
+                    onClick={() => navigate('/dashboard/profile')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
+                        {userData.profileImage ? (
+                          <img 
+                            src={userData.profileImage} 
+                            alt={userData.firstName} 
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-lg">{userData.firstName[0]}</span>
+                        )}
+                      </div>
+                      <span>{userData.firstName}</span>
+                    </div>
                   </div>
                 )}
                 <Button
@@ -192,8 +208,24 @@ const Navbar = () => {
           ) : user ? (
             <>
               {userData && (
-                <div className="px-4 py-2 text-gray-300 font-sans">
-                  {userData.firstName}
+                <div 
+                  className="px-4 py-2 text-gray-300 font-sans cursor-pointer hover:text-white transition-colors"
+                  onClick={() => navigate('/dashboard/profile')}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
+                      {userData.profileImage ? (
+                        <img 
+                          src={userData.profileImage} 
+                          alt={userData.firstName} 
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-lg">{userData.firstName[0]}</span>
+                      )}
+                    </div>
+                    <span>{userData.firstName}</span>
+                  </div>
                 </div>
               )}
               <Button

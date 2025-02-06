@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../config/firebase';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, fetchSignInMethodsForEmail, linkWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { auth, db } from '../../config/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
+import { motion } from 'framer-motion';
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -10,6 +13,8 @@ function Login() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -20,17 +25,155 @@ function Login() {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleEmailLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
+    // Basic validation
+    if (!formData.email || !formData.password) {
+      setError('Please enter both email and password');
+      setLoading(false);
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      navigate('/');
+      await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+      toast.success('Successfully logged in!');
+      navigate('/dashboard');
     } catch (error) {
-      setError('Invalid email or password');
-      console.error('Error signing in:', error);
+      console.error('Login error:', error);
+      
+      // Provide user-friendly error messages based on Firebase error codes
+      switch (error.code) {
+        case 'auth/invalid-credential':
+          setError(
+            'The email or password is incorrect. Please try again or click "Forgot password?" to reset your password.'
+          );
+          break;
+        case 'auth/user-not-found':
+          setError(
+            'No account found with this email. Please check your email or sign up for a new account.'
+          );
+          break;
+        case 'auth/wrong-password':
+          setError(
+            'Incorrect password. Please try again or use the "Forgot password?" option.'
+          );
+          break;
+        case 'auth/invalid-email':
+          setError('Please enter a valid email address.');
+          break;
+        case 'auth/user-disabled':
+          setError('This account has been disabled. Please contact support.');
+          break;
+        case 'auth/too-many-requests':
+          setError(
+            'Too many failed login attempts. Please try again later or reset your password.'
+          );
+          break;
+        case 'auth/network-request-failed':
+          setError(
+            'Network error. Please check your internet connection and try again.'
+          );
+          break;
+        default:
+          setError(
+            'Unable to sign in at this time. Please try again later.'
+          );
+      }
+
+      // Clear password field on error
+      setFormData(prev => ({
+        ...prev,
+        password: ''
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError('');
+    const provider = new GoogleAuthProvider();
+
+    try {
+      // First try to sign in with Google
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+
+      // Check if user exists in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // Create new user document if first time
+        await setDoc(userRef, {
+          firstName: user.displayName?.split(' ')[0] || '',
+          lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+          email: user.email,
+          profileImage: user.photoURL,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      toast.success('Successfully logged in with Google!');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Google login error:', error);
+      
+      // Check if the error is because email already exists
+      if (error.code === 'auth/account-exists-with-different-credential') {
+        try {
+          // Get sign-in methods for this email
+          const email = error.customData.email;
+          const methods = await fetchSignInMethodsForEmail(auth, email);
+          
+          if (methods.includes('password')) {
+            setError('An account already exists with this email. Please use your email/password to sign in first, then link your Google account from settings.');
+          } else {
+            setError('An account already exists with this email using a different sign-in method.');
+          }
+        } catch (innerError) {
+          console.error('Error checking existing account:', innerError);
+          setError('Failed to sign in with Google. Please try again.');
+        }
+      } else {
+        setError('Failed to sign in with Google');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      toast.success('Password reset email sent! Please check your inbox.');
+      setShowResetModal(false);
+      setError('');
+    } catch (error) {
+      console.error('Password reset error:', error);
+      setError('Failed to send reset email');
+    } finally {
       setLoading(false);
     }
   };
@@ -83,7 +226,7 @@ function Login() {
         </div>
 
         <div className="glass-effect rounded-lg p-6 backdrop-blur-lg bg-gray-800/40">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleEmailLogin} className="space-y-4">
             {error && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500 text-red-500 text-sm">
                 {error}
@@ -120,6 +263,16 @@ function Login() {
               />
             </div>
 
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(true)}
+                className="text-purple-400 hover:text-purple-300 font-medium"
+              >
+                Forgot password?
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -131,6 +284,25 @@ function Login() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               ) : 'Sign In'}
+            </button>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-600"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-900 text-gray-400">Or continue with</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full h-10 rounded-md text-gray-300 bg-gray-700/50 hover:bg-gray-700/70 transition-colors border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium"
+            >
+              <img src="/google.svg" alt="Google" className="w-5 h-5 mr-2" />
+              Sign in with Google
             </button>
           </form>
 
@@ -195,6 +367,49 @@ function Login() {
           </div>
         </div>
       </div>
+
+      {/* Password Reset Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="glass-effect rounded-lg p-6 backdrop-blur-lg bg-gray-800/90 max-w-md w-full border border-gray-700"
+          >
+            <h3 className="text-xl font-semibold text-white mb-4">Reset Password</h3>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Email address
+                </label>
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="block w-full h-10 rounded-md bg-gray-700/50 border-gray-600 text-gray-300 text-sm focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div className="flex justify-end space-x-4">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-cyan-500 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {loading ? 'Sending...' : 'Send Reset Link'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

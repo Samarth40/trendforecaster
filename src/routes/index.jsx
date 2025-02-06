@@ -18,6 +18,8 @@ import ArticleView from '../components/news/ArticleView';
 import Privacy from '../pages/Privacy';
 import Terms from '../pages/Terms';
 import Contact from '../pages/Contact';
+import Profile from '../pages/Profile';
+import PublicProfile from '../pages/PublicProfile';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -77,6 +79,7 @@ function AppRoutes() {
     <Routes>
       {/* Public Route - Landing Page */}
       <Route path="/" element={<Landing />} />
+      <Route path="/profile/:userId" element={<PublicProfile />} />
 
       {/* Public Routes with MainLayout */}
       <Route element={<MainLayout />}>
@@ -120,6 +123,7 @@ function AppRoutes() {
         <Route path="chat" element={<AIContentChat />} />
         <Route path="settings" element={<Settings />} />
         <Route path="saved-ideas" element={<SavedIdeas />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
 
       {/* Catch all other routes */}
