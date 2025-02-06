@@ -126,6 +126,7 @@ const TrendDetailPage = () => {
     if (!trend) return;
 
     setIsGeneratingIdeas(true);
+    setContentIdeas([]); // Clear existing ideas while loading
     try {
       const specificIdeas = [
         {
@@ -182,6 +183,9 @@ const TrendDetailPage = () => {
         }
       ];
 
+      // Add a slight delay to show loading animation
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       console.log('Generated content ideas:', specificIdeas);
       setContentIdeas(specificIdeas);
     } catch (error) {
@@ -728,9 +732,15 @@ const TrendDetailPage = () => {
               </button>
             </div>
 
-            {contentIdeas.length > 0 && (
-              <div className="mt-6 space-y-4">
-                {contentIdeas.slice(0, 5).map((idea, index) => (
+            {isGeneratingIdeas ? (
+              <div className="flex flex-col items-center justify-center p-8 space-y-4 bg-black/20 rounded-xl backdrop-blur-sm">
+                <div className="w-16 h-16 border-4 border-t-indigo-500 border-r-transparent border-b-indigo-500 border-l-transparent rounded-full animate-spin"></div>
+                <p className="text-lg text-gray-300 animate-pulse">Generating creative ideas for you...</p>
+                <p className="text-sm text-gray-400">This might take a moment</p>
+              </div>
+            ) : contentIdeas.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {contentIdeas.map((idea, index) => (
                   <motion.div
                     key={index}
                     className="w-full glass-effect rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-colors"
@@ -767,7 +777,7 @@ const TrendDetailPage = () => {
                   </motion.div>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Content Idea Modal */}
