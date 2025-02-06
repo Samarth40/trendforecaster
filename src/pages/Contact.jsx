@@ -1,37 +1,40 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Mail, MessageSquare, User } from 'lucide-react';
+import emailjs from '@emailjs/browser';
+import { toast } from 'react-toastify';
 import Footer from '../components/layout/Footer';
 
 export default function Contact() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    message: ''
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const formRef = useRef();
+  const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setLoading(true);
 
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setSubmitted(true);
-    setIsSubmitting(false);
-    setFormData({ name: '', email: '', message: '' });
+    try {
+      await emailjs.sendForm(
+        'service_euci9c6',
+        'template_9py9fpm',
+        formRef.current,
+        'qADHIQp58ZDAzLBGq'
+      );
 
-    // Reset success message after 5 seconds
-    setTimeout(() => setSubmitted(false), 5000);
-  };
+      setSubmitted(true);
+      toast.success('Message sent successfully!');
+      // Reset form
+      formRef.current.reset();
 
-  const handleChange = (e) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+      // Reset success message after 5 seconds
+      setTimeout(() => setSubmitted(false), 5000);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Failed to send message. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -61,16 +64,14 @@ export default function Contact() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="bg-[#1A1F32]/50 backdrop-blur-sm p-8 rounded-2xl border border-gray-800"
             >
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="block text-gray-400 mb-2 text-sm">Your Name</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                     <input
                       type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
+                      name="user_name"
                       required
                       className="w-full bg-[#0F1629]/50 border border-gray-800 rounded-xl py-3 px-5 pl-12 text-gray-300 focus:outline-none focus:border-indigo-500 transition-colors"
                       placeholder="John Doe"
@@ -84,9 +85,7 @@ export default function Contact() {
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                     <input
                       type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
+                      name="user_email"
                       required
                       className="w-full bg-[#0F1629]/50 border border-gray-800 rounded-xl py-3 px-5 pl-12 text-gray-300 focus:outline-none focus:border-indigo-500 transition-colors"
                       placeholder="john@example.com"
@@ -100,8 +99,6 @@ export default function Contact() {
                     <MessageSquare className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
                     <textarea
                       name="message"
-                      value={formData.message}
-                      onChange={handleChange}
                       required
                       rows="5"
                       className="w-full bg-[#0F1629]/50 border border-gray-800 rounded-xl py-3 px-5 pl-12 text-gray-300 focus:outline-none focus:border-indigo-500 transition-colors"
@@ -112,14 +109,14 @@ export default function Contact() {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={loading}
                   className={`w-full py-4 px-6 rounded-xl text-white font-medium flex items-center justify-center space-x-2 transition-all duration-300 ${
-                    isSubmitting
+                    loading
                       ? 'bg-gray-600 cursor-not-allowed'
                       : 'bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:shadow-lg hover:shadow-indigo-500/25'
                   }`}
                 >
-                  {isSubmitting ? (
+                  {loading ? (
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
@@ -157,14 +154,14 @@ export default function Contact() {
                   <h3 className="text-xl font-semibold text-gray-200 mb-2">Email Us</h3>
                   <p className="text-gray-400">
                     For general inquiries:{' '}
-                    <a href="mailto:info@trendforecaster.com" className="text-indigo-400 hover:text-indigo-300">
-                      info@trendforecaster.com
+                    <a href="mailto:samarthshinde9023@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+                      samarthshinde9023@gmail.com
                     </a>
                   </p>
                   <p className="text-gray-400">
                     For support:{' '}
-                    <a href="mailto:support@trendforecaster.com" className="text-indigo-400 hover:text-indigo-300">
-                      support@trendforecaster.com
+                    <a href="mailto:samarthshinde9023@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+                      samarthshinde9023@gmail.com
                     </a>
                   </p>
                 </div>
