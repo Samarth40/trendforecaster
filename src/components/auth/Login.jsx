@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, fetchSignInMethodsForEmail, linkWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, fetchSignInMethodsForEmail, linkWithCredential, EmailAuthProvider, sendEmailVerification, signOut } from 'firebase/auth';
 import { auth, db } from '../../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { toast } from 'react-toastify';
@@ -16,6 +16,8 @@ function Login() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const [verificationMessage, setVerificationMessage] = useState(location.state?.message || '');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -46,7 +48,37 @@ function Login() {
     }
 
     try {
-      await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+      const userCredential = await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+      
+      // Check if email is verified
+      if (!userCredential.user.emailVerified) {
+        // Send another verification email
+        await sendEmailVerification(userCredential.user, {
+          url: window.location.origin + '/login',
+          handleCodeInApp: false
+        });
+        
+        // Sign out the user
+        await signOut(auth);
+        
+        setError(
+          'Your email is not verified. A new verification link has been sent to your email. ' +
+          'Please check your inbox and verify your email before logging in.'
+        );
+        return;
+      }
+
+      // Update emailVerified status in Firestore if needed
+      const userRef = doc(db, 'users', userCredential.user.uid);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists() && userDoc.data().emailVerified === false) {
+        await setDoc(userRef, {
+          ...userDoc.data(),
+          emailVerified: true,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
       toast.success('Successfully logged in!');
       navigate('/dashboard');
     } catch (error) {
@@ -226,13 +258,19 @@ function Login() {
         </div>
 
         <div className="glass-effect rounded-lg p-6 backdrop-blur-lg bg-gray-800/40">
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500 text-red-500 text-sm">
-                {error}
-              </div>
-            )}
+          {verificationMessage && (
+            <div className="p-3 rounded-md bg-blue-500/10 border border-blue-500 text-blue-400 text-sm mb-4">
+              {verificationMessage}
+            </div>
+          )}
+          
+          {error && (
+            <div className="p-3 rounded-md bg-red-500/10 border border-red-500 text-red-500 text-sm mb-4">
+              {error}
+            </div>
+          )}
 
+          <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
                 Email
@@ -299,10 +337,10 @@ function Login() {
               type="button"
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full h-10 rounded-md text-gray-300 bg-gray-700/50 hover:bg-gray-700/70 transition-colors border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium"
+              className="w-full h-10 rounded-md text-gray-300 bg-white hover:bg-gray-50 transition-colors border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium gap-2"
             >
-              <img src="/google.svg" alt="Google" className="w-5 h-5 mr-2" />
-              Sign in with Google
+              <img src="/google.svg" alt="Google" className="w-5 h-5" />
+              <span className="text-gray-600">Sign in with Google</span>
             </button>
           </form>
 

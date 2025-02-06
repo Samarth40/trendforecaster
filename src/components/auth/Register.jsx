@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, fetchSignInMethodsForEmail } from 'firebase/auth';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, fetchSignInMethodsForEmail, sendEmailVerification, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { toast } from 'react-toastify';
@@ -44,20 +44,49 @@ function Register() {
         formData.password
       );
 
+      // Send verification email
+      await sendEmailVerification(userCredential.user, {
+        url: window.location.origin + '/login', // Redirect URL after verification
+        handleCodeInApp: false
+      });
+
       // Create user document in Firestore
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
+        emailVerified: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
 
-      toast.success('Account created successfully!');
-      navigate('/dashboard');
+      // Sign out the user immediately
+      await signOut(auth);
+
+      toast.success('Account created! Please check your email for verification link.');
+      navigate('/login', { 
+        state: { 
+          message: 'Your account has been created successfully. Please verify your email before logging in. Check your inbox for the verification link.' 
+        }
+      });
     } catch (error) {
       console.error('Registration error:', error);
-      setError(error.message);
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setError('An account with this email already exists. Please try logging in.');
+          break;
+        case 'auth/invalid-email':
+          setError('Please enter a valid email address.');
+          break;
+        case 'auth/operation-not-allowed':
+          setError('Email/password accounts are not enabled. Please contact support.');
+          break;
+        case 'auth/weak-password':
+          setError('Please choose a stronger password. It should be at least 6 characters long.');
+          break;
+        default:
+          setError('Failed to create account. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -276,10 +305,10 @@ function Register() {
               type="button"
               onClick={handleGoogleRegister}
               disabled={loading}
-              className="w-full h-10 rounded-md text-gray-300 bg-gray-700/50 hover:bg-gray-700/70 transition-colors border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium"
+              className="w-full h-10 rounded-md text-gray-300 bg-white hover:bg-gray-50 transition-colors border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium gap-2"
             >
-              <img src="/google.svg" alt="Google" className="w-5 h-5 mr-2" />
-              Sign up with Google
+              <img src="/google.svg" alt="Google" className="w-5 h-5" />
+              <span className="text-gray-600">Sign up with Google</span>
             </button>
           </form>
 
